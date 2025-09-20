@@ -38,10 +38,13 @@ LOG_PREFIX = ${_COLOR_BEGIN} ~>${_COLOR_END}
 
 BINARY_PATH = bin
 INCLUDE_PATH = include
-LIBRARY_PATH = lib
 SOURCE_PATH = src
 
+SSDEEZ_INCLUDE_PATH = ../include
+SSDEEZ_LIBRARY_PATH = ../lib
+
 OBJECTS = \
+	${SOURCE_PATH}/test_die_ops.o  \
 	${SOURCE_PATH}/main.o
 
 TARGET = ${BINARY_PATH}/${PROJECT_NAME}
@@ -51,13 +54,15 @@ TARGET = ${BINARY_PATH}/${PROJECT_NAME}
 CC = cc
 AR = ar
 
-CFLAGS = -D_DEFAULT_SOURCE -g -I${INCLUDE_PATH} -O2 -std=c99
+CFLAGS = -D_DEFAULT_SOURCE -g                   \
+	-I${SSDEEZ_INCLUDE_PATH} -I${INCLUDE_PATH}  \
+	-O2 -std=c99
 
 # AHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH
 CFLAGS += -fsanitize=address,leak,undefined -Wall -Werror -Wextra -Wpedantic
 
-LDFLAGS = -L${LIBRARY_PATH}
-LDLIBS = -llib${PROJECT_NAME}
+LDFLAGS = -L${SSDEEZ_LIBRARY_PATH}
+LDLIBS = -lssdeez
 
 # ============================================================================>
 
@@ -74,7 +79,7 @@ build: ${TARGET}
 
 ${TARGET}: ${OBJECTS}
 	@mkdir -p ${BINARY_PATH}
-	@${CC} ${OBJECTS} -o $@ ${CFLAGS}
+	@${CC} ${OBJECTS} -o $@ ${CFLAGS} ${LDFLAGS} ${LDLIBS}
 
 post-build:
 	@printf "${LOG_PREFIX} Build complete.\n"

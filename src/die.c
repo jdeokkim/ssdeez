@@ -27,8 +27,10 @@
 
 /* A structure that represents a group of NAND flash planes. */
 struct dzDie_ {
-    dzDieConfig config;     // The configuration of this die
-    unsigned char *buffer;  // The buffer used to access plane, block, etc.
+    dzByte *buffer;        // The buffer used to access plane, block, etc.
+    dzU32 *peCycleCounts;  // The number of P/E cycles per page
+    dzDieConfig config;    // The configuration of this die
+    dzU64 cellCount;       // The total number of cells in this die
     // TODO: ...
 };
 
@@ -54,16 +56,24 @@ dzDie *dzDieCreate(dzDieConfig config) {
 
     // clang-format off
 
-    size_t bufferSize = (
-        config.planeCountPerDie 
-            * config.blockCountPerPlane
-            * config.pageCountPerBlock 
-            * config.pageSizeInBytes
-    );
+    dzU64 pageCountPerDie = config.planeCountPerDie 
+        * config.blockCountPerPlane
+        * config.layerCountPerBlock
+        * config.pageCountPerLayer;
+    
+    // NOTE: Allocating a byte for each cell in a page!
+    dzU64 cellCountPerDie = pageCountPerDie * config.cellCountPerPage;
 
     // clang-format on
 
-    die->buffer = malloc(bufferSize * sizeof *(die->buffer));
+    die->buffer = malloc(cellCountPerDie * sizeof *(die->buffer));
+
+    {
+        die->peCycleCounts = malloc(pageCountPerDie
+                                    * sizeof *(die->peCycleCounts));
+
+        // TODO: ...
+    }
 
     return die;
 }
@@ -72,5 +82,9 @@ dzDie *dzDieCreate(dzDieConfig config) {
 void dzDieRelease(dzDie *die) {
     if (die == NULL) return;
 
-    free(die->buffer), free(die);
+    free(die->peCycleCounts), free(die->buffer), free(die);
 }
+
+/* Private Functions ======================================================> */
+
+// TODO: ...

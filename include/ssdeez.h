@@ -20,23 +20,37 @@
 
 #ifdef __cplusplus
 extern "C" {
-#endif // `__cplusplus`
+#endif  // `__cplusplus`
 
 /* Includes ==============================================================> */
 
+#include <stdbool.h>
+#include <stdint.h>
 #include <stdlib.h>
 
-/* Macros ================================================================> */
+/* Macros =================================================================> */
 
-/* Typedefs ==============================================================> */
+/* Typedefs ===============================================================> */
+
+/* Aliases for primitive integer types. */
+
+typedef unsigned char dzByte;
+
+typedef int32_t       dzI32;
+typedef int64_t       dzI64;
+
+typedef uint32_t      dzU32;
+typedef uint64_t      dzU64;
+
+/* ========================================================================> */
 
 /* An enumeration that represents the type of a NAND flash cell. */
 typedef enum dzCellType_ {
     DZ_CELL_UNKNOWN,
-    DZ_CELL_SLC,      // 1 voltage state
-    DZ_CELL_MLC,      // 2 voltage states
-    DZ_CELL_TLC,      // 3 voltage states
-    DZ_CELL_QLC       // 4 voltage states
+    DZ_CELL_SLC,  // 1 voltage state
+    DZ_CELL_DLC,  // 2 voltage states
+    DZ_CELL_TLC,  // 3 voltage states
+    DZ_CELL_QLC   // 4 voltage states
 } dzCellType;
 
 /* ========================================================================> */
@@ -55,10 +69,11 @@ typedef struct dzDie_ dzDie;
 /* A structure that represents the configuration of a `dzDie`. */
 typedef struct dzDieConfig_ {
     dzCellType cellType;
-    int planeCountPerDie;
-    int blockCountPerPlane;
-    int pageCountPerBlock;
-    int pageSizeInBytes;
+    dzU32 planeCountPerDie;
+    dzU32 blockCountPerPlane;
+    dzU32 layerCountPerBlock;  // NOTE: V-NAND (3D NAND)
+    dzU32 pageCountPerLayer;
+    dzU32 cellCountPerPage;
 } dzDieConfig;
 
 /* Public Functions =======================================================> */
@@ -66,7 +81,7 @@ typedef struct dzDieConfig_ {
 /* <-------------------------------------------------------- [src/channel.c] */
 
 /* Creates a channel with the given `id`. */
-dzChannel *dzChannelCreate(int id);
+dzChannel *dzChannelCreate(dzI32 id);
 
 /* Releases the memory allocated for the `channel`. */
 void dzChannelRelease(dzChannel *channel);
@@ -78,6 +93,10 @@ dzDie *dzDieCreate(dzDieConfig config);
 
 /* Releases the memory allocated for the `die`. */
 void dzDieRelease(dzDie *die);
+
+// TODO: dzDieProgramPage
+
+// TODO: dzDieReadPage
 
 /* ========================================================================> */
 

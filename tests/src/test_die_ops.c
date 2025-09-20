@@ -20,22 +20,27 @@
 #include "greatest.h"
 #include "ssdeez.h"
 
-/* Public Function Prototypes =============================================> */
+/* Private Function Prototypes ============================================> */
 
-SUITE_EXTERN(dzTestDieOps);
+TEST dzTestCellRw(void);
 
 /* Public Functions =======================================================> */
 
-GREATEST_MAIN_DEFS();
+SUITE(dzTestDieOps) {
+    RUN_TEST(dzTestCellRw);
+}
 
-/* ========================================================================> */
+/* Private Functions ======================================================> */
 
-int main(int argc, char *argv[]) {
-    GREATEST_MAIN_BEGIN();
+TEST dzTestCellRw(void) {
+    dzDie *die = dzDieCreate((dzDieConfig) { .cellType = DZ_CELL_TLC,
+                                             .planeCountPerDie = 1,
+                                             .blockCountPerPlane = 8,
+                                             .layerCountPerBlock = 1,
+                                             .pageCountPerLayer = 4,
+                                             .cellCountPerPage = 32 });
 
-    RUN_SUITE(dzTestDieOps);
+    dzDieRelease(die);
 
-    GREATEST_MAIN_END();
-
-    return 0;
+    PASS();
 }
