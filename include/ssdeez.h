@@ -34,6 +34,8 @@ extern "C" {
 
 /* Aliases for primitive integer types. */
 
+typedef bool          dzBool;
+
 typedef unsigned char dzByte;
 
 typedef int32_t       dzI32;
@@ -97,6 +99,11 @@ void dzDieRelease(dzDie *die);
 // TODO: dzDieProgramPage
 
 // TODO: dzDieReadPage
+
+/* <---------------------------------------------------------- [src/utils.c] */
+
+/* Returns the next pseudo-random number from the xoshiro256++ generator. */
+dzU64 dzUtilsRand(void);
 
 /* ========================================================================> */
 
