@@ -40,7 +40,15 @@ struct dzDie_ {
 
 /* Constants ==============================================================> */
 
-// TODO: ...
+/* The "baseline" numbers of P/E cycles per page, for each cell type. */
+static const dzU32 basePeCycleCounts[DZ_CELL_TYPE_COUNT_] = {
+    [DZ_CELL_TYPE_SLC] = 85000U,
+    [DZ_CELL_TYPE_MLC] = 19000U,
+    [DZ_CELL_TYPE_TLC] = 2250U,
+    [DZ_CELL_TYPE_QLC] = 750U
+};
+
+static const dzF32 basePeCycleCountPenalty = 0.2f;
 
 /* Private Variables ======================================================> */
 
@@ -58,21 +66,45 @@ dzDie *dzDieCreate(dzDieConfig config) {
 
     dzU64 pageCountPerDie = config.planeCountPerDie 
         * config.blockCountPerPlane
-        * config.layerCountPerBlock
-        * config.pageCountPerLayer;
-    
-    // NOTE: Allocating a byte for each cell in a page!
-    dzU64 cellCountPerDie = pageCountPerDie * config.cellCountPerPage;
+        * config.layerCountPerBlock;
 
     // clang-format on
 
-    die->buffer = malloc(cellCountPerDie * sizeof *(die->buffer));
+    // NOTE: Allocating a byte for each cell in a page!
+    die->buffer = malloc(config.pageSizeInBytes * sizeof *(die->buffer));
 
     {
         die->peCycleCounts = malloc(pageCountPerDie
                                     * sizeof *(die->peCycleCounts));
 
-        // TODO: ...
+        dzBool hasMultiLayers = pageCountPerDie > 2;
+
+        dzU64 centerPageIndex = pageCountPerDie >> 1;
+
+        for (dzU64 i = 0U; i < pageCountPerDie; i++) {
+            die->peCycleCounts[i] =
+                dzUtilsGaussian(basePeCycleCounts[config.cellType], 128.0f);
+
+            if (hasMultiLayers) {
+                // clang-format off
+
+                dzF32 distanceFromCenter = (i > centerPageIndex) 
+                    ? (centerPageIndex - i) 
+                    : (i - centerPageIndex);
+
+                dzF32 penaltyScale = distanceFromCenter / centerPageIndex;
+
+                /*
+                    NOTE: Pages in the top and bottom layers
+                          should have the lowest endurance
+                */
+
+                die->peCycleCounts[i] *= 1.0f - \
+                    (penaltyScale * basePeCycleCountPenalty);
+
+                // clang-format on
+            }
+        }
     }
 
     return die;

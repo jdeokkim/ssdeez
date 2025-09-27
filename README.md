@@ -17,6 +17,7 @@ I present SSDeez, a lightweight NAND flash-based SSD simulator written in C, for
 ## References
 
 - [A. Tavakkol, J. Gómez-Luna, M. Sadrosadati, S. Ghose, and O. Mutlu, "MQSim: A Framework for Enabling Realistic Studies of Modern Multi-Queue SSD Devices," USENIX Conference on File and Storage Technologies (FAST), Feb. 2018.](https://www.usenix.org/system/files/conference/fast18/fast18-tavakkol.pdf)
+- [M. Raquibuzzaman, A. Milenkovic and B. Ray, "Intrablock Wear Leveling to Counter Layer-to-Layer Endurance Variation of 3-D NAND Flash Memory," IEEE Transactions on Electron Devices, Jan. 2023.](https://ieeexplore.ieee.org/document/9966490)
 - [Y. Kim, B. Tauras, A. Gupta and B. Urgaonkar, "FlashSim: A Simulator for NAND Flash-Based Solid-State Drives," International Conference on Advances in System Simulation (SIMUL), Sep. 2009.](https://ieeexplore.ieee.org/document/5283998)
 
 ## License

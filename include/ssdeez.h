@@ -30,6 +30,21 @@ extern "C" {
 
 /* Macros =================================================================> */
 
+/* Compiler-specific attribute for a function that must be inlined. */
+#ifndef DZ_API_INLINE
+    #ifdef _MSC_VER
+        #define DZ_API_INLINE __forceinline
+    #elif defined(__GNUC__)
+        #if defined(__STRICT_ANSI__)
+            #define DZ_API_INLINE __inline__ __attribute__((always_inline))
+        #else
+            #define DZ_API_INLINE inline __attribute__((always_inline))
+        #endif
+    #else
+        #define DZ_API_INLINE inline
+    #endif
+#endif  // `DZ_API_INLINE`
+
 /* Typedefs ===============================================================> */
 
 /* Aliases for primitive integer types. */
@@ -44,15 +59,19 @@ typedef int64_t       dzI64;
 typedef uint32_t      dzU32;
 typedef uint64_t      dzU64;
 
+typedef float         dzF32;
+typedef double        dzF64;
+
 /* ========================================================================> */
 
 /* An enumeration that represents the type of a NAND flash cell. */
 typedef enum dzCellType_ {
-    DZ_CELL_UNKNOWN,
-    DZ_CELL_SLC,  // 1 voltage state
-    DZ_CELL_DLC,  // 2 voltage states
-    DZ_CELL_TLC,  // 3 voltage states
-    DZ_CELL_QLC   // 4 voltage states
+    DZ_CELL_TYPE_UNKNOWN,
+    DZ_CELL_TYPE_SLC,      // 1 voltage state
+    DZ_CELL_TYPE_MLC,      // 2 voltage states
+    DZ_CELL_TYPE_TLC,      // 3 voltage states
+    DZ_CELL_TYPE_QLC,      // 4 voltage states
+    DZ_CELL_TYPE_COUNT_
 } dzCellType;
 
 /* ========================================================================> */
@@ -73,9 +92,8 @@ typedef struct dzDieConfig_ {
     dzCellType cellType;
     dzU32 planeCountPerDie;
     dzU32 blockCountPerPlane;
-    dzU32 layerCountPerBlock;  // NOTE: V-NAND (3D NAND)
-    dzU32 pageCountPerLayer;
-    dzU32 cellCountPerPage;
+    dzU32 layerCountPerBlock;
+    dzU32 pageSizeInBytes;
 } dzDieConfig;
 
 /* Public Functions =======================================================> */
@@ -102,8 +120,8 @@ void dzDieRelease(dzDie *die);
 
 /* <---------------------------------------------------------- [src/utils.c] */
 
-/* Returns the next pseudo-random number from the xoshiro256++ generator. */
-dzU64 dzUtilsRand(void);
+/* Returns a pseudo-random number from a Gaussian distribution. */
+dzF32 dzUtilsGaussian(dzF32 mu, dzF32 sigma);
 
 /* ========================================================================> */
 

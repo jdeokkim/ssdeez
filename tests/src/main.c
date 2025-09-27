@@ -23,6 +23,7 @@
 /* Public Function Prototypes =============================================> */
 
 SUITE_EXTERN(dzTestDieOps);
+SUITE_EXTERN(dzTestUtils);
 
 /* Public Functions =======================================================> */
 
@@ -34,6 +35,7 @@ int main(int argc, char *argv[]) {
     GREATEST_MAIN_BEGIN();
 
     RUN_SUITE(dzTestDieOps);
+    RUN_SUITE(dzTestUtils);
 
     GREATEST_MAIN_END();
 

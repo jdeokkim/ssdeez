@@ -56,8 +56,9 @@ AR = ar
 
 CFLAGS = -D_DEFAULT_SOURCE -g -I${INCLUDE_PATH} -O2 -std=c99
 
-# AHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH
 CFLAGS += -fsanitize=address,leak,undefined -Wall -Werror -Wextra -Wpedantic
+
+LDLIBS = -lm
 
 # ============================================================================>
 
@@ -80,7 +81,7 @@ build-bin: ${TARGET_BIN}
 
 ${TARGET_BIN}: ${OBJECTS} ${SOURCE_PATH}/main.o
 	@mkdir -p ${BINARY_PATH}
-	@${CC} ${OBJECTS} ${SOURCE_PATH}/main.o -o $@ ${CFLAGS}
+	@${CC} ${OBJECTS} ${SOURCE_PATH}/main.o -o $@ ${CFLAGS} ${LDLIBS}
 
 # ============================================================================>
 
@@ -89,7 +90,7 @@ build-lib: ${TARGET_LIB}
 ${TARGET_LIB}: ${OBJECTS}
 	@mkdir -p ${LIBRARY_PATH}
 	@printf "${LOG_PREFIX} Linking: ${TARGET_LIB}\n"
-	@${AR} rcs ${TARGET_LIB} ${OBJECTS}
+	@${AR} -rcs ${TARGET_LIB} ${OBJECTS}
 
 # ============================================================================>
 

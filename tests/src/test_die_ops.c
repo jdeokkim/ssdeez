@@ -22,23 +22,28 @@
 
 /* Private Function Prototypes ============================================> */
 
-TEST dzTestCellRw(void);
+TEST dzTestDieRw(void);
 
 /* Public Functions =======================================================> */
 
 SUITE(dzTestDieOps) {
-    RUN_TEST(dzTestCellRw);
+    RUN_TEST(dzTestDieRw);
 }
 
 /* Private Functions ======================================================> */
 
-TEST dzTestCellRw(void) {
-    dzDie *die = dzDieCreate((dzDieConfig) { .cellType = DZ_CELL_TLC,
-                                             .planeCountPerDie = 1,
-                                             .blockCountPerPlane = 8,
-                                             .layerCountPerBlock = 1,
-                                             .pageCountPerLayer = 4,
-                                             .cellCountPerPage = 32 });
+TEST dzTestDieRw(void) {
+    dzDie *die = dzDieCreate(
+        (dzDieConfig) {
+            .cellType = DZ_CELL_TYPE_MLC,
+            .planeCountPerDie = 2U,
+            .blockCountPerPlane = 4U,
+            .layerCountPerBlock = 5U,
+            .pageSizeInBytes = 16U
+        }
+    );
+
+    // TODO: ...
 
     dzDieRelease(die);
 

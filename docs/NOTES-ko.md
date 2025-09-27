@@ -32,7 +32,15 @@
 
 ---
 
-### Page
+### Page와 Block
+
+- **NAND String:** Cell을 직렬로 연결한 것 (3D CTF 구조에서는 각각의 기둥)
+    - **Bitline:** String의 모든 Cell을 순서대로 읽거나 쓰는 용도로, Channel 최상단에 위치함
+    - **Wordline:** Layer의 모든 Cell을 한번에 선택하는 용도로, Cell 중심부를 감싸고 있음
+
+- **Page:** 같은 Wordline에 있는 모든 Cell을 묶어서 만든, Program 연산의 기본 단위
+
+- **Block:** 여러 개의 Page를 묶어서 만든, Erase 연산의 기본 단위
 
 ---
 

@@ -17,12 +17,15 @@
 
 /* Includes ===============================================================> */
 
+#include <float.h>
+#include <limits.h>
+#include <math.h>
+
 #include "ssdeez.h"
 
 /* Macros =================================================================> */
 
-#define BITWISE_ROTATE_LEFT_U64(x, k) \
-    (((x) << (k)) | ((x) >> (64 - (k))))
+#define BITWISE_ROTATE_LEFT_U64(x, k) (((x) << (k)) | ((x) >> (64 - (k))))
 
 /* Typedefs ===============================================================> */
 
@@ -30,21 +33,61 @@
 
 /* Private Function Prototypes ============================================> */
 
-// TODO: ...
+/* Returns the next pseudo-random number from the xoshiro256++ generator. */
+static DZ_API_INLINE dzU64 dzUtilsRand(void);
 
 /* Constants ==============================================================> */
 
-// TODO: ...
+/* 
+    Special constant for `dzUtilsGaussian()`, 
+    in order to avoid explicit `float` conversions. 
+*/
+static const dzF32 INVERSE_UINT64_MAX = 1.0f / UINT64_MAX;
 
 /* Private Variables ======================================================> */
 
-/* NOTE: Deterministic behavior for research purposes... */
-static dzU64 prngState[4] = { 0x20, 0x25, 0x09, 0x26 };
+/* NOTE: Deterministic behavior for research purposes? */
+static dzU64 prngStates[4] = { 0x2025, 0x0926, 0x2116, 0x1200 };
 
 /* Public Functions =======================================================> */
 
+/* Returns a pseudo-random number from a Gaussian distribution. */
+dzF32 dzUtilsGaussian(dzF32 mu, dzF32 sigma) {
+    /* 
+        NOTE: Marsaglia polar method, with pseudo-random numbers 
+              from the xoshiro256++ generator.
+    */
+
+    static dzBool hasNextValue = false;
+
+    static dzF32 nextValue = FLT_EPSILON;
+
+    if (hasNextValue) {
+        hasNextValue = !hasNextValue;
+
+        return mu + (nextValue * sigma);
+    } else {
+        dzF32 x, y, r;
+
+        do {
+            x = 2.0f * (dzUtilsRand() * INVERSE_UINT64_MAX) - 1.0f;
+            y = 2.0f * (dzUtilsRand() * INVERSE_UINT64_MAX) - 1.0f;
+
+            r = x * x + y * y;
+        } while (r >= 1.0f || r == 0.0f);
+
+        r = sqrtf(-2.0f * (logf(r) / r));
+
+        nextValue = y * r, hasNextValue = !hasNextValue;
+
+        return mu + ((x * r) * sigma);
+    }
+}
+
+/* Private Functions ======================================================> */
+
 /* Returns the next pseudo-random number from the xoshiro256++ generator. */
-dzU64 dzUtilsRand(void) {
+static DZ_API_INLINE dzU64 dzUtilsRand(void) {
     /*
         NOTE: The original code was written in 2019
               by David Blackman and Sebastiano Vigna.
@@ -52,25 +95,21 @@ dzU64 dzUtilsRand(void) {
               (https://prng.di.unimi.it)
     */
 
-    dzU64 result = BITWISE_ROTATE_LEFT_U64(prngState[0] + prngState[3], 23) \
-        + prngState[0];
+    dzU64 result = BITWISE_ROTATE_LEFT_U64(prngStates[0] + prngStates[3], 23)
+                   + prngStates[0];
 
-	{
-        const dzU64 tempValue = prngState[1] << 17;
+    {
+        const dzU64 tempValue = prngStates[1] << 17;
 
-        prngState[2] ^= prngState[0];
-        prngState[3] ^= prngState[1];
-        prngState[1] ^= prngState[2];
-        prngState[0] ^= prngState[3];
+        prngStates[2] ^= prngStates[0];
+        prngStates[3] ^= prngStates[1];
+        prngStates[1] ^= prngStates[2];
+        prngStates[0] ^= prngStates[3];
 
-        prngState[2] ^= tempValue;
+        prngStates[2] ^= tempValue;
 
-        prngState[3] = BITWISE_ROTATE_LEFT_U64(prngState[3], 45);
+        prngStates[3] = BITWISE_ROTATE_LEFT_U64(prngStates[3], 45);
     }
 
-	return result;
+    return result;
 }
-
-/* Private Functions ======================================================> */
-
-// TODO: ...
