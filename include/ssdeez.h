@@ -45,6 +45,21 @@ extern "C" {
     #endif
 #endif  // `DZ_API_INLINE`
 
+/* Macro-defined Constants ================================================> */
+
+/* 
+    Maximum penalty factor applied to the number of P/E cycles per page,
+    for each layer in a block.
+*/
+#define DZ_PAGE_PE_CYCLE_COUNT_MAX_PENALTY   0.2f
+
+/* 
+    Standard deviation for the Gaussian distribution 
+    of the numbers of P/E cycles.
+*/
+
+#define DZ_PAGE_PE_CYCLE_COUNT_STDDEV        128.0f
+
 /* Typedefs ===============================================================> */
 
 /* Aliases for primitive integer types. */
@@ -66,13 +81,24 @@ typedef double        dzF64;
 
 /* An enumeration that represents the type of a NAND flash cell. */
 typedef enum dzCellType_ {
-    DZ_CELL_TYPE_UNKNOWN,
-    DZ_CELL_TYPE_SLC,      // 1 voltage state
-    DZ_CELL_TYPE_MLC,      // 2 voltage states
-    DZ_CELL_TYPE_TLC,      // 3 voltage states
-    DZ_CELL_TYPE_QLC,      // 4 voltage states
+    DZ_CELL_TYPE_UNKNOWN = -1,
+    DZ_CELL_TYPE_SLC,          // 1 voltage state
+    DZ_CELL_TYPE_MLC,          // 4 voltage states
+    DZ_CELL_TYPE_TLC,          // 8 voltage states
+    DZ_CELL_TYPE_QLC,          // 16 voltage states
     DZ_CELL_TYPE_COUNT_
 } dzCellType;
+
+/* An enumeration that represents the status of a NAND flash page. */
+typedef enum dzPageStatus_ {
+    DZ_PAGE_STATUS_UNKNOWN = -1,
+    DZ_PAGE_STATUS_BAD,
+    DZ_PAGE_STATUS_FREE,
+    DZ_PAGE_STATUS_VALID,
+    DZ_PAGE_STATUS_INVALID,
+    DZ_PAGE_STATUS_RESERVED,
+    DZ_PAGE_STATUS_COUNT_
+} dzPageStatus;
 
 /* ========================================================================> */
 
@@ -96,27 +122,51 @@ typedef struct dzDieConfig_ {
     dzU32 pageSizeInBytes;
 } dzDieConfig;
 
+/* ========================================================================> */
+
+/* A structure that represents the metadata of a NAND flash page. */
+typedef struct dzPageMetadata_ dzPageMetadata;
+
 /* Public Functions =======================================================> */
 
 /* <-------------------------------------------------------- [src/channel.c] */
 
 /* Creates a channel with the given `id`. */
-dzChannel *dzChannelCreate(dzI32 id);
+dzChannel *dzChannelCreate(dzU64 id);
 
 /* Releases the memory allocated for the `channel`. */
 void dzChannelRelease(dzChannel *channel);
 
 /* <------------------------------------------------------------ [src/die.c] */
 
-/* Creates a die with the given configuration. */
+/* Creates a die with the given `config`. */
 dzDie *dzDieCreate(dzDieConfig config);
 
 /* Releases the memory allocated for the `die`. */
 void dzDieRelease(dzDie *die);
 
-// TODO: dzDieProgramPage
+/* Writes `srcBuffer` to the `pageIndex`-th page in `die`. */
+// bool dzDieProgramPage(dzDie *die, dzU64 pageIndex, const void *srcBuffer);
 
-// TODO: dzDieReadPage
+/* 
+    Reads data from the `pageIndex`-th page in `die`, 
+    then copies it to `dstBuffer`. 
+*/
+// bool dzDieReadPage(dzDie *die, dzU64 pageIndex, void *dstBuffer);
+
+/* <------------------------------------------------------------ [src/page.c] */
+
+/* Creates an array of page metadata based on the given `config`. */
+dzPageMetadata *dzPageCreateMetadata(dzDieConfig config);
+
+/* Releases the memory allocated for `pageMetadata`. */
+void dzPageReleaseMetadata(dzPageMetadata *pageMetadata);
+
+/* Marks the `pageIndex`-th page as valid. */
+bool dzPageMarkAsValid(dzPageMetadata *pageMetadata, dzU64 pageIndex);
+
+/* Marks the `pageIndex`-th page as free. */
+bool dzPageMarkAsFree(dzPageMetadata *pageMetadata, dzU64 pageIndex);
 
 /* <---------------------------------------------------------- [src/utils.c] */
 

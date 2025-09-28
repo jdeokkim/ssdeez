@@ -39,6 +39,7 @@
     - **Wordline:** Layer의 모든 Cell을 한번에 선택하는 용도로, Cell 중심부를 감싸고 있음
 
 - **Page:** 같은 Wordline에 있는 모든 Cell을 묶어서 만든, Program 연산의 기본 단위
+    - **Erase-before-Write:** Floating Gate 또는 Charge Trap에서 전자를 다 빼야 Cell의 내용을 변경 가능
 
 - **Block:** 여러 개의 Page를 묶어서 만든, Erase 연산의 기본 단위
 

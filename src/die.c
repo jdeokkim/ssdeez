@@ -27,10 +27,9 @@
 
 /* A structure that represents a group of NAND flash planes. */
 struct dzDie_ {
-    dzByte *buffer;        // The buffer used to access plane, block, etc.
-    dzU32 *peCycleCounts;  // The number of P/E cycles per page
-    dzDieConfig config;    // The configuration of this die
-    dzU64 cellCount;       // The total number of cells in this die
+    dzDieConfig config;
+    dzPageMetadata *pageMetadata;
+    dzByte *buffer;
     // TODO: ...
 };
 
@@ -40,15 +39,7 @@ struct dzDie_ {
 
 /* Constants ==============================================================> */
 
-/* The "baseline" numbers of P/E cycles per page, for each cell type. */
-static const dzU32 basePeCycleCounts[DZ_CELL_TYPE_COUNT_] = {
-    [DZ_CELL_TYPE_SLC] = 85000U,
-    [DZ_CELL_TYPE_MLC] = 19000U,
-    [DZ_CELL_TYPE_TLC] = 2250U,
-    [DZ_CELL_TYPE_QLC] = 750U
-};
-
-static const dzF32 basePeCycleCountPenalty = 0.2f;
+// TODO: ...
 
 /* Private Variables ======================================================> */
 
@@ -62,50 +53,10 @@ dzDie *dzDieCreate(dzDieConfig config) {
 
     die->config = config;
 
-    // clang-format off
-
-    dzU64 pageCountPerDie = config.planeCountPerDie 
-        * config.blockCountPerPlane
-        * config.layerCountPerBlock;
-
-    // clang-format on
+    die->pageMetadata = dzPageCreateMetadata(config);
 
     // NOTE: Allocating a byte for each cell in a page!
     die->buffer = malloc(config.pageSizeInBytes * sizeof *(die->buffer));
-
-    {
-        die->peCycleCounts = malloc(pageCountPerDie
-                                    * sizeof *(die->peCycleCounts));
-
-        dzBool hasMultiLayers = pageCountPerDie > 2;
-
-        dzU64 centerPageIndex = pageCountPerDie >> 1;
-
-        for (dzU64 i = 0U; i < pageCountPerDie; i++) {
-            die->peCycleCounts[i] =
-                dzUtilsGaussian(basePeCycleCounts[config.cellType], 128.0f);
-
-            if (hasMultiLayers) {
-                // clang-format off
-
-                dzF32 distanceFromCenter = (i > centerPageIndex) 
-                    ? (centerPageIndex - i) 
-                    : (i - centerPageIndex);
-
-                dzF32 penaltyScale = distanceFromCenter / centerPageIndex;
-
-                /*
-                    NOTE: Pages in the top and bottom layers
-                          should have the lowest endurance
-                */
-
-                die->peCycleCounts[i] *= 1.0f - \
-                    (penaltyScale * basePeCycleCountPenalty);
-
-                // clang-format on
-            }
-        }
-    }
 
     return die;
 }
@@ -114,7 +65,7 @@ dzDie *dzDieCreate(dzDieConfig config) {
 void dzDieRelease(dzDie *die) {
     if (die == NULL) return;
 
-    free(die->peCycleCounts), free(die->buffer), free(die);
+    free(die->buffer), free(die->pageMetadata), free(die);
 }
 
 /* Private Functions ======================================================> */

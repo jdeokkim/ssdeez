@@ -30,7 +30,7 @@
     and a group of dies. 
 */
 struct dzChannel_ {
-    dzI32 id;  // The ID of the channel.
+    dzU64 id;  // The ID of the channel.
     // TODO: ...
 };
 
@@ -49,7 +49,7 @@ struct dzChannel_ {
 /* Public Functions =======================================================> */
 
 /* Creates a channel with the given `id`. */
-dzChannel *dzChannelCreate(dzI32 id) {
+dzChannel *dzChannelCreate(dzU64 id) {
     dzChannel *channel = malloc(sizeof *channel);
 
     channel->id = id;
