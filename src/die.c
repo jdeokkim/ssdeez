@@ -51,6 +51,8 @@ struct dzDie_ {
 dzDie *dzDieCreate(dzDieConfig config) {
     dzDie *die = malloc(sizeof *die);
 
+    if (die == NULL) return die;
+
     die->config = config;
 
     die->pageMetadata = dzPageCreateMetadata(config);

@@ -55,7 +55,7 @@ extern "C" {
 
 /* 
     Standard deviation for the Gaussian distribution 
-    of the numbers of P/E cycles.
+    of the maximum P/E cycles per page.
 */
 
 #define DZ_PAGE_PE_CYCLE_COUNT_STDDEV        128.0f
@@ -89,16 +89,16 @@ typedef enum dzCellType_ {
     DZ_CELL_TYPE_COUNT_
 } dzCellType;
 
-/* An enumeration that represents the status of a NAND flash page. */
-typedef enum dzPageStatus_ {
-    DZ_PAGE_STATUS_UNKNOWN = -1,
-    DZ_PAGE_STATUS_BAD,
-    DZ_PAGE_STATUS_FREE,
-    DZ_PAGE_STATUS_VALID,
-    DZ_PAGE_STATUS_INVALID,
-    DZ_PAGE_STATUS_RESERVED,
-    DZ_PAGE_STATUS_COUNT_
-} dzPageStatus;
+/* An enumeration that represents the state of a NAND flash page. */
+typedef enum dzPageState_ {
+    DZ_PAGE_STATE_UNKNOWN = -1,
+    DZ_PAGE_STATE_FREE,
+    DZ_PAGE_STATE_VALID,
+    DZ_PAGE_STATE_INVALID,
+    DZ_PAGE_STATE_CORRUPTED,
+    DZ_PAGE_STATE_RESERVED,
+    DZ_PAGE_STATE_COUNT_
+} dzPageState;
 
 /* ========================================================================> */
 

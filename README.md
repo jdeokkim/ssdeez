@@ -6,11 +6,36 @@
 
 # SSDeez 🥜
 
-I present SSDeez, a lightweight NAND flash-based SSD simulator written in C, for educational purposes.
+I present SSDeez, a lightweight NAND flash-based SSD simulator written in C99, for educational purposes.
 
 </div>
 
 ## Features
+
+- Page-Level
+  - [x] Page States
+  - [x] Randomized P/E Cycle Count (Per Page)
+    - [x] Gaussian Sampling ([Marsaglia's Polar](https://www.jstor.org/stable/2027592) + [xoshiro256++](https://prng.di.unimi.it))
+    - [x] Layer-to-Layer Endurance Variation
+  - [ ] Program Latency
+  - [ ] Read Latency
+- Block-Level
+  - [ ] Block States
+  - [ ] Erase Latency
+- Plane-Level
+- Die-Level
+- Channel-Level
+- SSD-Level
+
+~~TODO: More Features~~
+
+<!-- TODO: ... -->
+
+## Prerequisites
+
+<!-- TODO: ... -->
+
+## Build Instructions
 
 <!-- TODO: ... -->
 
@@ -18,6 +43,7 @@ I present SSDeez, a lightweight NAND flash-based SSD simulator written in C, for
 
 - [A. Tavakkol, J. Gómez-Luna, M. Sadrosadati, S. Ghose, and O. Mutlu, "MQSim: A Framework for Enabling Realistic Studies of Modern Multi-Queue SSD Devices," USENIX Conference on File and Storage Technologies (FAST), Feb. 2018.](https://www.usenix.org/system/files/conference/fast18/fast18-tavakkol.pdf)
 - [M. Raquibuzzaman, A. Milenkovic and B. Ray, "Intrablock Wear Leveling to Counter Layer-to-Layer Endurance Variation of 3-D NAND Flash Memory," IEEE Transactions on Electron Devices, Jan. 2023.](https://ieeexplore.ieee.org/document/9966490)
+- [Y. Kai, E. F. Haratsch, O. Mutlu, and K. Mai, "Threshold Voltage Distribution in MLC NAND Flash Memory: Characterization, Analysis, and Modeling," Design, Automation & Test in Europe (DATE) Conference & Exhibition, 2013.](https://users.ece.cmu.edu/~omutlu/pub/flash-memory-voltage-characterization_date13.pdf)
 - [Y. Kim, B. Tauras, A. Gupta and B. Urgaonkar, "FlashSim: A Simulator for NAND Flash-Based Solid-State Drives," International Conference on Advances in System Simulation (SIMUL), Sep. 2009.](https://ieeexplore.ieee.org/document/5283998)
 
 ## License

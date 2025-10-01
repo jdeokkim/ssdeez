@@ -27,7 +27,7 @@
 
 /* A structure that represents the metadata of a NAND flash page. */
 struct dzPageMetadata_ {
-    dzPageStatus status;
+    dzPageState state;
     dzU32 peCycleCount;
     // TODO: ...
 };
@@ -89,6 +89,8 @@ dzPageMetadata *dzPageCreateMetadata(dzDieConfig config) {
     dzPageMetadata *pageMetadata = malloc(pageCountPerDie
                                           * sizeof *pageMetadata);
 
+    if (pageMetadata == NULL) return pageMetadata;
+
     {
         dzU64 centerPageIndex = pageCountPerDie >> 1;
 
@@ -96,7 +98,7 @@ dzPageMetadata *dzPageCreateMetadata(dzDieConfig config) {
         dzBool shouldApplyPenalty = pageCountPerDie > 2;
 
         for (dzU64 i = 0U; i < pageCountPerDie; i++) {
-            pageMetadata[i].status = DZ_PAGE_STATUS_FREE;
+            pageMetadata[i].state = DZ_PAGE_STATE_FREE;
 
             pageMetadata[i].peCycleCount =
                 dzUtilsGaussian(basePeCycleCounts[config.cellType],
@@ -130,11 +132,11 @@ void dzPageReleaseMetadata(dzPageMetadata *pageMetadata) {
 /* Marks the `pageIndex`-th page as valid. */
 bool dzPageMarkAsValid(dzPageMetadata *pageMetadata, dzU64 pageIndex) {
     if (pageMetadata == NULL
-        || pageMetadata[pageIndex].status != DZ_PAGE_STATUS_FREE
+        || pageMetadata[pageIndex].state != DZ_PAGE_STATE_FREE
         || pageMetadata[pageIndex].peCycleCount == 0U)
         return false;
 
-    pageMetadata[pageIndex].status = DZ_PAGE_STATUS_VALID;
+    pageMetadata[pageIndex].state = DZ_PAGE_STATE_VALID;
 
     // TODO: P/E Latency
 
@@ -144,16 +146,16 @@ bool dzPageMarkAsValid(dzPageMetadata *pageMetadata, dzU64 pageIndex) {
 /* Marks the `pageIndex`-th page as free. */
 bool dzPageMarkAsFree(dzPageMetadata *pageMetadata, dzU64 pageIndex) {
     if (pageMetadata == NULL
-        || pageMetadata[pageIndex].status == DZ_PAGE_STATUS_BAD
-        || pageMetadata[pageIndex].status == DZ_PAGE_STATUS_FREE
+        || pageMetadata[pageIndex].state == DZ_PAGE_STATE_CORRUPTED
+        || pageMetadata[pageIndex].state == DZ_PAGE_STATE_FREE
         || pageMetadata[pageIndex].peCycleCount == 0U)
         return false;
 
     pageMetadata[pageIndex].peCycleCount--;
 
-    pageMetadata[pageIndex].status = (pageMetadata[pageIndex].peCycleCount > 0)
-                                         ? DZ_PAGE_STATUS_FREE
-                                         : DZ_PAGE_STATUS_BAD;
+    pageMetadata[pageIndex].state = (pageMetadata[pageIndex].peCycleCount > 0)
+                                         ? DZ_PAGE_STATE_FREE
+                                         : DZ_PAGE_STATE_CORRUPTED;
 
     // TODO: P/E Latency
 

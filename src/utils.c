@@ -54,7 +54,7 @@ static dzU64 prngStates[4] = { 0x2025, 0x0926, 0x2116, 0x1200 };
 /* Returns a pseudo-random number from a Gaussian distribution. */
 dzF32 dzUtilsGaussian(dzF32 mu, dzF32 sigma) {
     /* 
-        NOTE: Marsaglia polar method, with pseudo-random numbers 
+        NOTE: Marsaglia's polar method, with pseudo-random numbers 
               from the xoshiro256++ generator.
     */
 

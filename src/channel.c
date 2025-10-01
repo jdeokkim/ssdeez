@@ -52,6 +52,8 @@ struct dzChannel_ {
 dzChannel *dzChannelCreate(dzU64 id) {
     dzChannel *channel = malloc(sizeof *channel);
 
+    if (channel == NULL) return channel;
+
     channel->id = id;
 
     return channel;
