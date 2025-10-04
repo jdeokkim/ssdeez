@@ -17,25 +17,42 @@
 
 /* Includes ===============================================================> */
 
+#include <math.h>
+
 #include "ssdeez.h"
 
 /* Macros =================================================================> */
 
-// TODO: ...
+#define dzDiePageForEach(dieBuffer, dieMetadata, ptrIdentifier) \
+    for (dzByte *ptrIdentifier = (dieBuffer),                   \
+                *ptrIdentifier##__LINE__ =                      \
+                    (dieBuffer)                                 \
+                    + ((dieMetadata).pageCountPerDie            \
+                       * (dieMetadata).physicalPageSize);       \
+         ptrIdentifier < ptrIdentifier##__LINE__;               \
+         ptrIdentifier += (dieMetadata).physicalPageSize)
 
 /* Typedefs ===============================================================> */
+
+/* A structure that represents the metadata of a NAND flash die. */
+struct dzDieMetadata_ {
+    dzU64 pageCountPerDie;
+    dzU64 physicalPageSize;
+    // TODO: ...
+};
 
 /* A structure that represents a group of NAND flash planes. */
 struct dzDie_ {
     dzDieConfig config;
-    dzPageMetadata *pageMetadata;
+    dzDieMetadata metadata;
     dzByte *buffer;
     // TODO: ...
 };
 
 /* Private Function Prototypes ============================================> */
 
-// TODO: ...
+/* Creates a die buffer with the given `config` and `metadata`. */
+static dzByte *dzDieCreateBuffer(dzDieConfig config, dzDieMetadata metadata);
 
 /* Constants ==============================================================> */
 
@@ -47,7 +64,7 @@ struct dzDie_ {
 
 /* Public Functions =======================================================> */
 
-/* Creates a die with the given configuration. */
+/* Creates a die with the given `config`. */
 dzDie *dzDieCreate(dzDieConfig config) {
     dzDie *die = malloc(sizeof *die);
 
@@ -55,10 +72,23 @@ dzDie *dzDieCreate(dzDieConfig config) {
 
     die->config = config;
 
-    die->pageMetadata = dzPageCreateMetadata(config);
+    // clang-format off
 
-    // NOTE: Allocating a byte for each cell in a page!
-    die->buffer = malloc(config.pageSizeInBytes * sizeof *(die->buffer));
+    die->metadata = (dzDieMetadata) {
+        .pageCountPerDie = config.planeCountPerDie 
+                             * config.blockCountPerPlane
+                             * config.layerCountPerBlock,
+        .physicalPageSize = config.pageSizeInBytes 
+                             + dzPageGetMetadataSize()
+    };
+
+    // clang-format on
+
+    if ((die->buffer = dzDieCreateBuffer(config, die->metadata)) == NULL) {
+        dzDieRelease(die);
+
+        return NULL;
+    }
 
     return die;
 }
@@ -67,9 +97,49 @@ dzDie *dzDieCreate(dzDieConfig config) {
 void dzDieRelease(dzDie *die) {
     if (die == NULL) return;
 
-    free(die->buffer), free(die->pageMetadata), free(die);
+    free(die->buffer), free(die);
 }
 
 /* Private Functions ======================================================> */
 
-// TODO: ...
+/* Creates a die buffer with the given `config` and `metadata`. */
+static dzByte *dzDieCreateBuffer(dzDieConfig config, dzDieMetadata metadata) {
+    dzByte *result = NULL;
+
+    dzU64 bufferSize = metadata.pageCountPerDie * metadata.physicalPageSize;
+
+    if ((result = malloc(bufferSize * sizeof *result)) == NULL) return result;
+
+    dzU64 pageIndex = 0U, centerPageIndex = metadata.pageCountPerDie >> 1;
+
+    dzDiePageForEach(result, metadata, pagePtr) {
+        dzF32 peCycleCountPenalty = 1.0f;
+
+        // NOTE: Pages in the top and bottom layers should have lower endurance
+        if (metadata.pageCountPerDie > 2) {
+            dzF32 distanceFromCenter = fabsf(
+                (dzF32) (pageIndex - centerPageIndex));
+
+            dzF32 penaltyScale = distanceFromCenter / centerPageIndex;
+
+            peCycleCountPenalty -= (penaltyScale
+                                    * DZ_PAGE_PE_CYCLE_COUNT_MAX_PENALTY);
+        }
+
+        dzPageConfig pageConfig = {
+            .cellType = config.cellType,
+            .pageSizeInBytes = config.pageSizeInBytes,
+            .peCycleCountPenalty = peCycleCountPenalty
+        };
+
+        if (!dzPageInitMetadata(pagePtr, pageConfig)) {
+            free(result);
+
+            return NULL;
+        }
+
+        pageIndex++;
+    }
+
+    return result;
+}

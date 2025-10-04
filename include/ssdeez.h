@@ -25,6 +25,7 @@ extern "C" {
 /* Includes ==============================================================> */
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 
@@ -47,18 +48,23 @@ extern "C" {
 
 /* Macro-defined Constants ================================================> */
 
-/* 
-    Maximum penalty factor applied to the number of P/E cycles per page,
-    for each layer in a block.
+/*
+    Specifies how much space the OOB (Out-Of-Band) area takes up,
+    in relation to the total page size.
 */
-#define DZ_PAGE_PE_CYCLE_COUNT_MAX_PENALTY   0.2f
+#define DZ_PAGE_OUT_OF_BAND_SIZE_RATIO       0.05f
 
 /* 
-    Standard deviation for the Gaussian distribution 
-    of the maximum P/E cycles per page.
+    Maximum penalty factor applied to the maximum number of 
+    P/E cycles per page, for each layer in a block.
 */
+#define DZ_PAGE_PE_CYCLE_COUNT_MAX_PENALTY   0.25f
 
-#define DZ_PAGE_PE_CYCLE_COUNT_STDDEV        128.0f
+/*
+    Specifies the standard deviation ratio for initializing 
+    the maximum number of P/E cycles per page.
+*/
+#define DZ_PAGE_PE_CYCLE_COUNT_STDDEV_RATIO  0.1f
 
 /* Typedefs ===============================================================> */
 
@@ -67,6 +73,9 @@ extern "C" {
 typedef bool          dzBool;
 
 typedef unsigned char dzByte;
+
+typedef ptrdiff_t     dzISize;
+typedef size_t        dzUSize;
 
 typedef int32_t       dzI32;
 typedef int64_t       dzI64;
@@ -113,7 +122,7 @@ typedef struct dzChannel_ dzChannel;
 /* A structure that represents a group of NAND flash planes. */
 typedef struct dzDie_ dzDie;
 
-/* A structure that represents the configuration of a `dzDie`. */
+/* A structure that represents the configuration of a NAND flash die. */
 typedef struct dzDieConfig_ {
     dzCellType cellType;
     dzU32 planeCountPerDie;
@@ -122,7 +131,17 @@ typedef struct dzDieConfig_ {
     dzU32 pageSizeInBytes;
 } dzDieConfig;
 
+/* A structure that represents the metadata of a NAND flash die. */
+typedef struct dzDieMetadata_ dzDieMetadata;
+
 /* ========================================================================> */
+
+/* A structure that represents the configuration of a NAND flash page. */
+typedef struct dzPageConfig_ {
+    dzCellType cellType;
+    dzU32 pageSizeInBytes;
+    dzF32 peCycleCountPenalty;
+} dzPageConfig;
 
 /* A structure that represents the metadata of a NAND flash page. */
 typedef struct dzPageMetadata_ dzPageMetadata;
@@ -145,33 +164,35 @@ dzDie *dzDieCreate(dzDieConfig config);
 /* Releases the memory allocated for the `die`. */
 void dzDieRelease(dzDie *die);
 
-/* Writes `srcBuffer` to the `pageIndex`-th page in `die`. */
-// bool dzDieProgramPage(dzDie *die, dzU64 pageIndex, const void *srcBuffer);
-
-/* 
-    Reads data from the `pageIndex`-th page in `die`, 
-    then copies it to `dstBuffer`. 
-*/
-// bool dzDieReadPage(dzDie *die, dzU64 pageIndex, void *dstBuffer);
-
 /* <------------------------------------------------------------ [src/page.c] */
 
-/* Creates an array of page metadata based on the given `config`. */
-dzPageMetadata *dzPageCreateMetadata(dzDieConfig config);
+/* Initializes a page metadata object within the given `pageBuffer`. */
+bool dzPageInitMetadata(dzByte *pageBuffer, dzPageConfig config);
 
-/* Releases the memory allocated for `pageMetadata`. */
-void dzPageReleaseMetadata(dzPageMetadata *pageMetadata);
+/* Returns the size of `dzPageMetadata`. */
+dzUSize dzPageGetMetadataSize(void);
 
-/* Marks the `pageIndex`-th page as valid. */
-bool dzPageMarkAsValid(dzPageMetadata *pageMetadata, dzU64 pageIndex);
+/* Marks a page as valid. */
+bool dzPageMarkAsValid(dzByte *pageBuffer,
+                       dzU32 pageSizeInBytes,
+                       dzF32 *outLatency);
 
-/* Marks the `pageIndex`-th page as free. */
-bool dzPageMarkAsFree(dzPageMetadata *pageMetadata, dzU64 pageIndex);
+/* Marks a page as free. */
+bool dzPageMarkAsFree(dzByte *pageBuffer,
+                      dzU32 pageSizeInBytes,
+                      dzF32 *outLatency);
 
 /* <---------------------------------------------------------- [src/utils.c] */
 
 /* Returns a pseudo-random number from a Gaussian distribution. */
 dzF32 dzUtilsGaussian(dzF32 mu, dzF32 sigma);
+
+/* Inline Functions =======================================================> */
+
+/* Returns `true` if `cellType` is a valid NAND flash cell type. */
+DZ_API_INLINE bool dzIsValidCellType(dzCellType cellType) {
+    return (cellType > DZ_CELL_TYPE_UNKNOWN && cellType < DZ_CELL_TYPE_COUNT_);
+}
 
 /* ========================================================================> */
 
