@@ -27,17 +27,14 @@
 
 /* A structure that represents the metadata of a NAND flash page. */
 struct dzPageMetadata_ {
-    dzPageState state;
-    dzCellType cellType;
+    dzU64 logicalPageAddress;
     dzU64 totalProgramCount;
     dzU64 totalReadCount;
     dzU32 peCycleCount;
+    dzCellType cellType;
+    dzPageState state;
     // TODO: ...
 };
-
-/* Private Function Prototypes ============================================> */
-
-// TODO: ...
 
 /* Constants ==============================================================> */
 
@@ -50,22 +47,34 @@ static const dzU32 peCycleCountTable[DZ_CELL_TYPE_COUNT_] = {
 };
 
 /* Average 'program' latencies for each cell type, in miliseconds. */
-static const dzF32 programLatencyTable[DZ_CELL_TYPE_COUNT_] = {
-    [DZ_CELL_TYPE_SLC] = 1.0f,
-    [DZ_CELL_TYPE_MLC] = 2.5f,
-    [DZ_CELL_TYPE_TLC] = 3.75f,
-    [DZ_CELL_TYPE_QLC] = 5.5f
+static const dzF64 programLatencyTable[DZ_CELL_TYPE_COUNT_] = {
+    [DZ_CELL_TYPE_SLC] = 1.0,
+    [DZ_CELL_TYPE_MLC] = 2.5,
+    [DZ_CELL_TYPE_TLC] = 3.75,
+    [DZ_CELL_TYPE_QLC] = 5.5
 };
 
 /* Average 'read' latencies for each cell type, in miliseconds. */
-static const dzF32 readLatencyTable[DZ_CELL_TYPE_COUNT_] = {
-    [DZ_CELL_TYPE_SLC] = 0.015f,
-    [DZ_CELL_TYPE_MLC] = 0.035f,
-    [DZ_CELL_TYPE_TLC] = 0.060f,
-    [DZ_CELL_TYPE_QLC] = 0.095f
+static const dzF64 readLatencyTable[DZ_CELL_TYPE_COUNT_] = {
+    [DZ_CELL_TYPE_SLC] = 0.015,
+    [DZ_CELL_TYPE_MLC] = 0.035,
+    [DZ_CELL_TYPE_TLC] = 0.060,
+    [DZ_CELL_TYPE_QLC] = 0.095
 };
 
+/* ========================================================================> */
+
+/* A constant that represents an invalid logical page number. */
+const dzU64 DZ_PAGE_INVALID_LPN = UINT64_MAX;
+
+/* A constant that represents an invalid physical page number. */
+const dzU64 DZ_PAGE_INVALID_PPN = UINT64_MAX;
+
 /* Private Variables ======================================================> */
+
+// TODO: ...
+
+/* Private Function Prototypes ============================================> */
 
 // TODO: ...
 
@@ -80,28 +89,31 @@ bool dzPageInitMetadata(dzByte *pageBuffer, dzPageConfig config) {
     dzPageMetadata *pageMetadata =
         (dzPageMetadata *) (pageBuffer + config.pageSizeInBytes);
 
-    pageMetadata->state = DZ_PAGE_STATE_FREE;
+    {
+        pageMetadata->logicalPageAddress = DZ_PAGE_INVALID_LPN;
+        pageMetadata->totalProgramCount = 0U;
+        pageMetadata->totalReadCount = 0U;
 
-    pageMetadata->cellType = config.cellType;
+        pageMetadata->cellType = config.cellType;
 
-    pageMetadata->totalProgramCount = 0U;
-    pageMetadata->totalReadCount = 0U;
+        pageMetadata->state = DZ_PAGE_STATE_FREE;
+    }
 
     {
         // clang-format off
 
-        pageMetadata->peCycleCount = dzUtilsGaussian(
-            peCycleCountTable[config.cellType],
-            DZ_PAGE_PE_CYCLE_COUNT_STDDEV_RATIO
+        pageMetadata->peCycleCount = (dzU32) dzUtilsGaussian(
+            peCycleCountTable[config.cellType], 
+            DZ_PAGE_PE_CYCLE_COUNT_STDDEV_RATIO 
                 * peCycleCountTable[config.cellType]
         );
 
         // clang-format on
 
-        if (config.peCycleCountPenalty < 0.0f)
-            config.peCycleCountPenalty = 0.0f;
+        if (config.peCycleCountPenalty < 0.0) config.peCycleCountPenalty = 0.0;
 
-        pageMetadata->peCycleCount *= config.peCycleCountPenalty;
+        pageMetadata->peCycleCount = (dzU32) (config.peCycleCountPenalty
+                                              * pageMetadata->peCycleCount);
     }
 
     return true;
@@ -115,7 +127,7 @@ dzUSize dzPageGetMetadataSize(void) {
 /* Marks a page as valid. */
 bool dzPageMarkAsValid(dzByte *pageBuffer,
                        dzU32 pageSizeInBytes,
-                       dzF32 *outLatency) {
+                       dzF64 *outLatency) {
     if (pageBuffer == NULL || pageSizeInBytes == 0U || outLatency == NULL)
         return false;
 
@@ -137,7 +149,7 @@ bool dzPageMarkAsValid(dzByte *pageBuffer,
 /* Marks a page as free. */
 bool dzPageMarkAsFree(dzByte *pageBuffer,
                       dzU32 pageSizeInBytes,
-                      dzF32 *outLatency) {
+                      dzF64 *outLatency) {
     if (pageBuffer == NULL || pageSizeInBytes == 0U || outLatency == NULL)
         return false;
 

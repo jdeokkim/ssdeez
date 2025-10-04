@@ -33,15 +33,11 @@ SUITE(dzTestDieOps) {
 /* Private Functions ======================================================> */
 
 TEST dzTestDieRw(void) {
-    dzDie *die = dzDieCreate(
-        (dzDieConfig) {
-            .cellType = DZ_CELL_TYPE_MLC,
-            .planeCountPerDie = 2U,
-            .blockCountPerPlane = 4U,
-            .layerCountPerBlock = 5U,
-            .pageSizeInBytes = 16U
-        }
-    );
+    dzDie *die = dzDieCreate((dzDieConfig) { .cellType = DZ_CELL_TYPE_MLC,
+                                             .planeCountPerDie = 2U,
+                                             .blockCountPerPlane = 4U,
+                                             .layerCountPerBlock = 5U,
+                                             .pageSizeInBytes = 16U });
 
     // TODO: ...
 

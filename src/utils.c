@@ -31,28 +31,28 @@
 
 // TODO: ...
 
-/* Private Function Prototypes ============================================> */
-
-/* Returns the next pseudo-random number from the xoshiro256++ generator. */
-static DZ_API_INLINE dzU64 dzUtilsRand(void);
-
 /* Constants ==============================================================> */
 
 /* 
     Special constant for `dzUtilsGaussian()`, 
-    in order to avoid explicit `float` conversions. 
+    in order to avoid explicit `dzF64` conversions. 
 */
-static const dzF32 INVERSE_UINT64_MAX = 1.0f / UINT64_MAX;
+static const dzF64 INVERSE_UINT64_MAX = 1.0 / ((dzF64) UINT64_MAX);
 
 /* Private Variables ======================================================> */
 
 /* NOTE: Deterministic behavior for research purposes? */
 static dzU64 prngStates[4] = { 0x2025, 0x0926, 0x2116, 0x1200 };
 
+/* Private Function Prototypes ============================================> */
+
+/* Returns the next pseudo-random number from the xoshiro256++ generator. */
+static DZ_API_INLINE dzU64 dzUtilsRand(void);
+
 /* Public Functions =======================================================> */
 
 /* Returns a pseudo-random number from a Gaussian distribution. */
-dzF32 dzUtilsGaussian(dzF32 mu, dzF32 sigma) {
+dzF64 dzUtilsGaussian(dzF64 mu, dzF64 sigma) {
     /* 
         NOTE: Marsaglia's polar method, with pseudo-random numbers 
               from the xoshiro256++ generator.
@@ -60,23 +60,23 @@ dzF32 dzUtilsGaussian(dzF32 mu, dzF32 sigma) {
 
     static dzBool hasNextValue = false;
 
-    static dzF32 nextValue = FLT_EPSILON;
+    static dzF64 nextValue = DBL_EPSILON;
 
     if (hasNextValue) {
         hasNextValue = !hasNextValue;
 
         return mu + (nextValue * sigma);
     } else {
-        dzF32 x, y, r;
+        dzF64 x, y, r;
 
         do {
-            x = 2.0f * (dzUtilsRand() * INVERSE_UINT64_MAX) - 1.0f;
-            y = 2.0f * (dzUtilsRand() * INVERSE_UINT64_MAX) - 1.0f;
+            x = 2.0 * ((dzF64) dzUtilsRand() * INVERSE_UINT64_MAX) - 1.0;
+            y = 2.0 * ((dzF64) dzUtilsRand() * INVERSE_UINT64_MAX) - 1.0;
 
             r = x * x + y * y;
-        } while (r >= 1.0f || r == 0.0f);
+        } while (r >= 1.0 || r == 0.0);
 
-        r = sqrtf(-2.0f * (logf(r) / r));
+        r = sqrt(-2.0 * (log(r) / r));
 
         nextValue = y * r, hasNextValue = !hasNextValue;
 

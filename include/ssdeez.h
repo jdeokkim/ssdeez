@@ -27,6 +27,7 @@ extern "C" {
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 /* Macros =================================================================> */
@@ -52,19 +53,19 @@ extern "C" {
     Specifies how much space the OOB (Out-Of-Band) area takes up,
     in relation to the total page size.
 */
-#define DZ_PAGE_OUT_OF_BAND_SIZE_RATIO       0.05f
+#define DZ_PAGE_OUT_OF_BAND_SIZE_RATIO       0.05
 
 /* 
     Maximum penalty factor applied to the maximum number of 
     P/E cycles per page, for each layer in a block.
 */
-#define DZ_PAGE_PE_CYCLE_COUNT_MAX_PENALTY   0.25f
+#define DZ_PAGE_PE_CYCLE_COUNT_MAX_PENALTY   0.25
 
 /*
     Specifies the standard deviation ratio for initializing 
     the maximum number of P/E cycles per page.
 */
-#define DZ_PAGE_PE_CYCLE_COUNT_STDDEV_RATIO  0.1f
+#define DZ_PAGE_PE_CYCLE_COUNT_STDDEV_RATIO  0.1
 
 /* Typedefs ===============================================================> */
 
@@ -140,11 +141,16 @@ typedef struct dzDieMetadata_ dzDieMetadata;
 typedef struct dzPageConfig_ {
     dzCellType cellType;
     dzU32 pageSizeInBytes;
-    dzF32 peCycleCountPenalty;
+    dzF64 peCycleCountPenalty;
 } dzPageConfig;
 
 /* A structure that represents the metadata of a NAND flash page. */
 typedef struct dzPageMetadata_ dzPageMetadata;
+
+/* Constants ==============================================================> */
+
+/* A constant that represents an invalid physical page number. */
+extern const dzU64 DZ_PAGE_INVALID_PPN;
 
 /* Public Functions =======================================================> */
 
@@ -164,6 +170,12 @@ dzDie *dzDieCreate(dzDieConfig config);
 /* Releases the memory allocated for the `die`. */
 void dzDieRelease(dzDie *die);
 
+/* Converts `pagePtr` to a physical page number. */
+dzU64 dzDiePtrToPPN(const dzDie *die, const dzByte *pagePtr);
+
+/* Converts `ppn` to a physical page address. */
+dzByte *dzDiePPNToPtr(const dzDie *die, dzU64 ppn);
+
 /* <------------------------------------------------------------ [src/page.c] */
 
 /* Initializes a page metadata object within the given `pageBuffer`. */
@@ -175,17 +187,17 @@ dzUSize dzPageGetMetadataSize(void);
 /* Marks a page as valid. */
 bool dzPageMarkAsValid(dzByte *pageBuffer,
                        dzU32 pageSizeInBytes,
-                       dzF32 *outLatency);
+                       dzF64 *outLatency);
 
 /* Marks a page as free. */
 bool dzPageMarkAsFree(dzByte *pageBuffer,
                       dzU32 pageSizeInBytes,
-                      dzF32 *outLatency);
+                      dzF64 *outLatency);
 
 /* <---------------------------------------------------------- [src/utils.c] */
 
 /* Returns a pseudo-random number from a Gaussian distribution. */
-dzF32 dzUtilsGaussian(dzF32 mu, dzF32 sigma);
+dzF64 dzUtilsGaussian(dzF64 mu, dzF64 sigma);
 
 /* Inline Functions =======================================================> */
 

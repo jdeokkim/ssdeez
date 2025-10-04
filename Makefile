@@ -57,7 +57,8 @@ AR = ar
 
 CFLAGS = -D_DEFAULT_SOURCE -g -I${INCLUDE_PATH} -O2 -std=c99
 
-CFLAGS += -fsanitize=address,leak,undefined -Wall -Werror -Wextra -Wpedantic
+CFLAGS += -fsanitize=address,leak,undefined -Wall -Wconversion \
+	-Wdouble-promotion -Werror -Wextra -Wpedantic
 
 LDLIBS = -lm
 

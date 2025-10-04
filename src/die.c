@@ -49,18 +49,18 @@ struct dzDie_ {
     // TODO: ...
 };
 
+/* Private Variables ======================================================> */
+
+// TODO: ...
+
 /* Private Function Prototypes ============================================> */
 
 /* Creates a die buffer with the given `config` and `metadata`. */
 static dzByte *dzDieCreateBuffer(dzDieConfig config, dzDieMetadata metadata);
 
-/* Constants ==============================================================> */
-
-// TODO: ...
-
-/* Private Variables ======================================================> */
-
-// TODO: ...
+/* Returns `true` if `pagePtr` is pointing to a valid page in a die. */
+static DZ_API_INLINE bool dzDieIsValidPage(const dzDie *die,
+                                           const dzByte *pagePtr);
 
 /* Public Functions =======================================================> */
 
@@ -100,6 +100,24 @@ void dzDieRelease(dzDie *die) {
     free(die->buffer), free(die);
 }
 
+/* Converts `pagePtr` to a physical page number. */
+dzU64 dzDiePtrToPPN(const dzDie *die, const dzByte *pagePtr) {
+    if (!dzDieIsValidPage(die, pagePtr)) return DZ_PAGE_INVALID_PPN;
+
+    dzISize ptrOffset = pagePtr - die->buffer;
+
+    return (dzU64) (ptrOffset / die->config.pageSizeInBytes);
+}
+
+/* Converts `ppn` to a physical page address. */
+dzByte *dzDiePPNToPtr(const dzDie *die, dzU64 ppn) {
+    if (die == NULL || die->buffer == NULL
+        || ppn >= die->metadata.pageCountPerDie)
+        return NULL;
+
+    return die->buffer + (ppn * die->metadata.physicalPageSize);
+}
+
 /* Private Functions ======================================================> */
 
 /* Creates a die buffer with the given `config` and `metadata`. */
@@ -113,14 +131,16 @@ static dzByte *dzDieCreateBuffer(dzDieConfig config, dzDieMetadata metadata) {
     dzU64 pageIndex = 0U, centerPageIndex = metadata.pageCountPerDie >> 1;
 
     dzDiePageForEach(result, metadata, pagePtr) {
-        dzF32 peCycleCountPenalty = 1.0f;
+        dzF64 peCycleCountPenalty = 1.0;
 
         // NOTE: Pages in the top and bottom layers should have lower endurance
         if (metadata.pageCountPerDie > 2) {
-            dzF32 distanceFromCenter = fabsf(
-                (dzF32) (pageIndex - centerPageIndex));
+            dzU64 distanceFromCenter = (pageIndex > centerPageIndex)
+                                           ? (pageIndex - centerPageIndex)
+                                           : (centerPageIndex - pageIndex);
 
-            dzF32 penaltyScale = distanceFromCenter / centerPageIndex;
+            dzF64 penaltyScale = ((dzF64) distanceFromCenter
+                                  / (dzF64) centerPageIndex);
 
             peCycleCountPenalty -= (penaltyScale
                                     * DZ_PAGE_PE_CYCLE_COUNT_MAX_PENALTY);
@@ -142,4 +162,17 @@ static dzByte *dzDieCreateBuffer(dzDieConfig config, dzDieMetadata metadata) {
     }
 
     return result;
+}
+
+/* Returns `true` if `pagePtr` is pointing to a valid page in a die. */
+static DZ_API_INLINE bool dzDieIsValidPage(const dzDie *die,
+                                           const dzByte *pagePtr) {
+    if (die == NULL || pagePtr == NULL) return false;
+
+    const dzByte *firstPagePtr = die->buffer;
+    const dzByte *lastPagePtr = firstPagePtr
+                                + (die->metadata.pageCountPerDie
+                                   * die->metadata.physicalPageSize);
+
+    return (pagePtr >= firstPagePtr && pagePtr < lastPagePtr);
 }

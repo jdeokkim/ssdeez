@@ -54,7 +54,7 @@ TEST dzTestGaussian(void) {
     dzF32 kurtosis = 0.0f;
 
     {
-        dzF32 kNumerator = 0.0f, kDenominator = 0.0f; 
+        dzF32 kNumerator = 0.0f, kDenominator = 0.0f;
 
         for (int i = 0; i < DZ_TEST_GAUSSIAN_MAX_COUNT; i++) {
             dzF32 deviation = samples[i] - sampleMean;
