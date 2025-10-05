@@ -80,14 +80,14 @@ const dzU64 DZ_PAGE_INVALID_PPN = UINT64_MAX;
 
 /* Public Functions =======================================================> */
 
-/* Initializes a page metadata object within the given `pageBuffer`. */
-bool dzPageInitMetadata(dzByte *pageBuffer, dzPageConfig config) {
-    if (pageBuffer == NULL || !dzIsValidCellType(config.cellType)
+/* Initializes a page metadata object within the given `pagePtr`. */
+bool dzPageInitMetadata(dzByte *pagePtr, dzPageConfig config) {
+    if (pagePtr == NULL || !dzIsValidCellType(config.cellType)
         || config.pageSizeInBytes == 0U)
         return false;
 
     dzPageMetadata *pageMetadata =
-        (dzPageMetadata *) (pageBuffer + config.pageSizeInBytes);
+        (dzPageMetadata *) (pagePtr + config.pageSizeInBytes);
 
     {
         pageMetadata->logicalPageAddress = DZ_PAGE_INVALID_LPN;
@@ -124,14 +124,31 @@ dzUSize dzPageGetMetadataSize(void) {
     return sizeof(dzPageMetadata);
 }
 
+/* Returns the read latency of a page. */
+bool dzPageGetReadLatency(const dzByte *pagePtr,
+                          dzU32 pageSizeInBytes,
+                          dzF64 *readLatency) {
+    if (pagePtr == NULL || readLatency == NULL) return false;
+
+    dzPageMetadata *pageMetadata = (dzPageMetadata *) (pagePtr
+                                                       + pageSizeInBytes);
+
+    *readLatency =
+        dzUtilsGaussian(readLatencyTable[pageMetadata->cellType],
+                        DZ_PAGE_READ_LATENCY_STDDEV_RATIO
+                            * readLatencyTable[pageMetadata->cellType]);
+
+    return true;
+}
+
 /* Marks a page as valid. */
-bool dzPageMarkAsValid(dzByte *pageBuffer,
+bool dzPageMarkAsValid(dzByte *pagePtr,
                        dzU32 pageSizeInBytes,
-                       dzF64 *outLatency) {
-    if (pageBuffer == NULL || pageSizeInBytes == 0U || outLatency == NULL)
+                       dzF64 *programLatency) {
+    if (pagePtr == NULL || pageSizeInBytes == 0U || programLatency == NULL)
         return false;
 
-    dzPageMetadata *pageMetadata = (dzPageMetadata *) (pageBuffer
+    dzPageMetadata *pageMetadata = (dzPageMetadata *) (pagePtr
                                                        + pageSizeInBytes);
 
     if (pageMetadata->state != DZ_PAGE_STATE_FREE) return false;
@@ -140,20 +157,19 @@ bool dzPageMarkAsValid(dzByte *pageBuffer,
 
     pageMetadata->state = DZ_PAGE_STATE_VALID;
 
-    // NOTE: P/E Latency
-    *outLatency = programLatencyTable[pageMetadata->cellType];
+    *programLatency =
+        dzUtilsGaussian(programLatencyTable[pageMetadata->cellType],
+                        DZ_PAGE_PROGRAM_LATENCY_STDDEV_RATIO
+                            * programLatencyTable[pageMetadata->cellType]);
 
     return true;
 }
 
 /* Marks a page as free. */
-bool dzPageMarkAsFree(dzByte *pageBuffer,
-                      dzU32 pageSizeInBytes,
-                      dzF64 *outLatency) {
-    if (pageBuffer == NULL || pageSizeInBytes == 0U || outLatency == NULL)
-        return false;
+bool dzPageMarkAsFree(dzByte *pagePtr, dzU32 pageSizeInBytes) {
+    if (pagePtr == NULL || pageSizeInBytes == 0U) return false;
 
-    dzPageMetadata *pageMetadata = (dzPageMetadata *) (pageBuffer
+    dzPageMetadata *pageMetadata = (dzPageMetadata *) (pagePtr
                                                        + pageSizeInBytes);
 
     if (pageMetadata->state == DZ_PAGE_STATE_CORRUPTED
@@ -165,9 +181,6 @@ bool dzPageMarkAsFree(dzByte *pageBuffer,
     pageMetadata->state = (pageMetadata->peCycleCount == 0)
                               ? DZ_PAGE_STATE_CORRUPTED
                               : DZ_PAGE_STATE_FREE;
-
-    // NOTE: P/E Latency
-    *outLatency = readLatencyTable[pageMetadata->cellType];
 
     return true;
 }

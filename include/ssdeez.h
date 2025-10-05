@@ -49,53 +49,63 @@ extern "C" {
 
 /* Macro-defined Constants ================================================> */
 
+// clang-format off
+
 /*
     Specifies how much space the OOB (Out-Of-Band) area takes up,
     in relation to the total page size.
 */
-#define DZ_PAGE_OUT_OF_BAND_SIZE_RATIO       0.05
+#define DZ_PAGE_OUT_OF_BAND_SIZE_RATIO         0.05
 
 /* 
     Maximum penalty factor applied to the maximum number of 
     P/E cycles per page, for each layer in a block.
 */
-#define DZ_PAGE_PE_CYCLE_COUNT_MAX_PENALTY   0.25
+#define DZ_PAGE_PE_CYCLE_COUNT_MAX_PENALTY     0.25
 
 /*
     Specifies the standard deviation ratio for initializing 
     the maximum number of P/E cycles per page.
 */
-#define DZ_PAGE_PE_CYCLE_COUNT_STDDEV_RATIO  0.1
+#define DZ_PAGE_PE_CYCLE_COUNT_STDDEV_RATIO    0.1
+
+/* Specifies the standard deviation ratio for the program latency of a page. */
+#define DZ_PAGE_PROGRAM_LATENCY_STDDEV_RATIO   0.1
+
+/* Specifies the standard deviation ratio for the read latency of a page. */
+#define DZ_PAGE_READ_LATENCY_STDDEV_RATIO      0.1
+
+// clang-format on
 
 /* Typedefs ===============================================================> */
 
 /* Aliases for primitive integer types. */
 
-typedef bool          dzBool;
+typedef bool dzBool;
 
 typedef unsigned char dzByte;
 
-typedef ptrdiff_t     dzISize;
-typedef size_t        dzUSize;
+typedef ptrdiff_t dzISize;
+typedef size_t dzUSize;
 
-typedef int32_t       dzI32;
-typedef int64_t       dzI64;
+typedef int32_t dzI32;
+typedef int64_t dzI64;
 
-typedef uint32_t      dzU32;
-typedef uint64_t      dzU64;
+typedef uint32_t dzU32;
+typedef uint64_t dzU64;
 
-typedef float         dzF32;
-typedef double        dzF64;
+typedef float dzF32;
+typedef double dzF64;
 
 /* ========================================================================> */
 
 /* An enumeration that represents the type of a NAND flash cell. */
 typedef enum dzCellType_ {
     DZ_CELL_TYPE_UNKNOWN = -1,
-    DZ_CELL_TYPE_SLC,          // 1 voltage state
-    DZ_CELL_TYPE_MLC,          // 4 voltage states
-    DZ_CELL_TYPE_TLC,          // 8 voltage states
-    DZ_CELL_TYPE_QLC,          // 16 voltage states
+    DZ_CELL_TYPE_SLC,  // 1 voltage state
+    DZ_CELL_TYPE_MLC,  // 4 voltage states
+    DZ_CELL_TYPE_TLC,  // 8 voltage states
+    DZ_CELL_TYPE_QLC,  // 16 voltage states
     DZ_CELL_TYPE_COUNT_
 } dzCellType;
 
@@ -135,6 +145,9 @@ typedef struct dzDieConfig_ {
 /* A structure that represents the metadata of a NAND flash die. */
 typedef struct dzDieMetadata_ dzDieMetadata;
 
+/* A structure that represents various statistics of a NAND flash die. */
+typedef struct dzDieStatistics_ dzDieStatistics;
+
 /* ========================================================================> */
 
 /* A structure that represents the configuration of a NAND flash page. */
@@ -170,29 +183,41 @@ dzDie *dzDieCreate(dzDieConfig config);
 /* Releases the memory allocated for the `die`. */
 void dzDieRelease(dzDie *die);
 
+/* Returns the total number of pages in `die`. */
+dzU64 dzDieGetPageCount(const dzDie *die);
+
+/* Writes `srcBuffer` to the `ppn`-th page in `die`. */
+bool dzDieProgramPage(dzDie *die, dzU64 ppn, const void *srcBuffer);
+
+/* Reads data from the `ppn`-th page in `die`, copying it to `dstBuffer`. */
+bool dzDieReadPage(dzDie *die, dzU64 ppn, void *dstBuffer);
+
 /* Converts `pagePtr` to a physical page number. */
-dzU64 dzDiePtrToPPN(const dzDie *die, const dzByte *pagePtr);
+dzU64 dzDiePagePtrToPPN(const dzDie *die, const dzByte *pagePtr);
 
 /* Converts `ppn` to a physical page address. */
-dzByte *dzDiePPNToPtr(const dzDie *die, dzU64 ppn);
+dzByte *dzDiePPNToPagePtr(const dzDie *die, dzU64 ppn);
 
 /* <------------------------------------------------------------ [src/page.c] */
 
-/* Initializes a page metadata object within the given `pageBuffer`. */
-bool dzPageInitMetadata(dzByte *pageBuffer, dzPageConfig config);
+/* Initializes a page metadata object within the given `pagePtr`. */
+bool dzPageInitMetadata(dzByte *pagePtr, dzPageConfig config);
 
 /* Returns the size of `dzPageMetadata`. */
 dzUSize dzPageGetMetadataSize(void);
 
+/* Returns the read latency of a page. */
+bool dzPageGetReadLatency(const dzByte *pagePtr,
+                          dzU32 pageSizeInBytes,
+                          dzF64 *readLatency);
+
 /* Marks a page as valid. */
-bool dzPageMarkAsValid(dzByte *pageBuffer,
+bool dzPageMarkAsValid(dzByte *pagePtr,
                        dzU32 pageSizeInBytes,
-                       dzF64 *outLatency);
+                       dzF64 *programLatency);
 
 /* Marks a page as free. */
-bool dzPageMarkAsFree(dzByte *pageBuffer,
-                      dzU32 pageSizeInBytes,
-                      dzF64 *outLatency);
+bool dzPageMarkAsFree(dzByte *pagePtr, dzU32 pageSizeInBytes);
 
 /* <---------------------------------------------------------- [src/utils.c] */
 
