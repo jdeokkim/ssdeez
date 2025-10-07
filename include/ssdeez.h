@@ -75,27 +75,27 @@ extern "C" {
 /* Specifies the standard deviation ratio for the read latency of a page. */
 #define DZ_PAGE_READ_LATENCY_STDDEV_RATIO      0.1
 
-// clang-format on
-
 /* Typedefs ===============================================================> */
 
 /* Aliases for primitive integer types. */
 
-typedef bool dzBool;
+typedef bool          dzBool;
 
 typedef unsigned char dzByte;
 
-typedef ptrdiff_t dzISize;
-typedef size_t dzUSize;
+typedef ptrdiff_t     dzISize;
+typedef size_t        dzUSize;
 
-typedef int32_t dzI32;
-typedef int64_t dzI64;
+typedef int32_t       dzI32;
+typedef int64_t       dzI64;
 
-typedef uint32_t dzU32;
-typedef uint64_t dzU64;
+typedef uint32_t      dzU32;
+typedef uint64_t      dzU64;
 
-typedef float dzF32;
-typedef double dzF64;
+typedef float         dzF32;
+typedef double        dzF64;
+
+// clang-format on
 
 /* ========================================================================> */
 
@@ -135,6 +135,7 @@ typedef struct dzDie_ dzDie;
 
 /* A structure that represents the configuration of a NAND flash die. */
 typedef struct dzDieConfig_ {
+    // dzU64 dieId;
     dzCellType cellType;
     dzU32 planeCountPerDie;
     dzU32 blockCountPerPlane;
@@ -147,6 +148,11 @@ typedef struct dzDieMetadata_ dzDieMetadata;
 
 /* A structure that represents various statistics of a NAND flash die. */
 typedef struct dzDieStatistics_ dzDieStatistics;
+
+/* ========================================================================> */
+
+/* A structure that represents the metadata of a NAND flash block. */
+typedef struct dzBlockMetadata_ dzBlockMetadata;
 
 /* ========================================================================> */
 
@@ -167,13 +173,13 @@ extern const dzU64 DZ_PAGE_INVALID_PPN;
 
 /* Public Functions =======================================================> */
 
-/* <-------------------------------------------------------- [src/channel.c] */
+/* <---------------------------------------------------------- [src/block.c] */
 
-/* Creates a channel with the given `id`. */
-dzChannel *dzChannelCreate(dzU64 id);
+/* Creates a block metadata with the given `blockId`. */
+dzBlockMetadata *dzBlockCreateMetadata(dzU64 blockId);
 
-/* Releases the memory allocated for the `channel`. */
-void dzChannelRelease(dzChannel *channel);
+/* Releases the memory allocated for `blockMetadata`. */
+void dzBlockReleaseMetadata(dzBlockMetadata *blockMetadata);
 
 /* <------------------------------------------------------------ [src/die.c] */
 

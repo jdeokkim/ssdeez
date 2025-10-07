@@ -59,7 +59,8 @@ CFLAGS = -D_DEFAULT_SOURCE -g                   \
 	-I${SSDEEZ_INCLUDE_PATH} -I${INCLUDE_PATH}  \
 	-O2 -std=c99
 
-CFLAGS += -fsanitize=address,leak,undefined -Wall -Werror -Wextra -Wpedantic
+CFLAGS += -fsanitize=address,leak,undefined -Wall -Wconversion \
+	-Wdouble-promotion -Werror -Wextra -Wpedantic
 
 LDFLAGS = -L${SSDEEZ_LIBRARY_PATH}
 LDLIBS = -lm -lssdeez

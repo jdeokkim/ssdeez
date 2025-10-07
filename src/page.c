@@ -30,6 +30,8 @@ struct dzPageMetadata_ {
     dzU64 logicalPageAddress;
     dzU64 totalProgramCount;
     dzU64 totalReadCount;
+    /// dzF64 lastProgramTime;
+    // dzF64 lastReadTime;
     dzU32 peCycleCount;
     dzCellType cellType;
     dzPageState state;
@@ -91,8 +93,12 @@ bool dzPageInitMetadata(dzByte *pagePtr, dzPageConfig config) {
 
     {
         pageMetadata->logicalPageAddress = DZ_PAGE_INVALID_LPN;
+
         pageMetadata->totalProgramCount = 0U;
         pageMetadata->totalReadCount = 0U;
+
+        // pageMetadata->lastProgramTime = 0.0;
+        // pageMetadata->lastReadTime = 0.0;
 
         pageMetadata->cellType = config.cellType;
 

@@ -21,22 +21,21 @@
 
 /* Macros =================================================================> */
 
-// TODO: ...
-
-/* Typedefs ===============================================================> */
-
-/* 
-    A structure that represents an interface between the controller 
-    and a group of dies. 
-*/
-struct dzChannel_ {
-    dzU64 id;  // The ID of the channel.
+/* A structure that represents the metadata of a NAND flash block. */
+struct dzBlockMetadata_ {
+    dzU64 blockId;
+    // dzF64 lastEraseTime;
     // TODO: ...
 };
 
-/* Constants ==============================================================> */
+/* Typedefs ===============================================================> */
 
 // TODO: ...
+
+/* Constants ==============================================================> */
+
+/* A constant that represents an invalid block id. */
+const dzU64 DZ_BLOCK_INVALID_ID = UINT64_MAX;
 
 /* Private Variables ======================================================> */
 
@@ -48,18 +47,16 @@ struct dzChannel_ {
 
 /* Public Functions =======================================================> */
 
-/* Creates a channel with the given `id`. */
-dzChannel *dzChannelCreate(dzU64 id) {
-    dzChannel *channel = malloc(sizeof *channel);
+/* Creates a block metadata with the given `blockId`. */
+dzBlockMetadata *dzBlockCreateMetadata(dzU64 blockId) {
+    dzBlockMetadata *blockMetadata = malloc(sizeof *blockMetadata);
 
-    if (channel == NULL) return channel;
+    blockMetadata->blockId = blockId;
 
-    channel->id = id;
-
-    return channel;
+    return blockMetadata;
 }
 
-/* Releases the memory allocated for the `channel`. */
-void dzChannelRelease(dzChannel *channel) {
-    free(channel);
+/* Releases the memory allocated for `blockMetadata`. */
+void dzBlockReleaseMetadata(dzBlockMetadata *blockMetadata) {
+    free(blockMetadata);
 }

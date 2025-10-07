@@ -37,6 +37,7 @@
 
 /* A structure that represents the metadata of a NAND flash die. */
 struct dzDieMetadata_ {
+    dzU64 blockCountPerDie;
     dzU64 pageCountPerDie;
     dzU64 physicalPageSize;
     // TODO: ...
@@ -90,17 +91,16 @@ dzDie *dzDieCreate(dzDieConfig config) {
 
     die->config = config;
 
-    // clang-format off
+    {
+        die->metadata.blockCountPerDie = config.planeCountPerDie
+                                         * config.blockCountPerPlane;
 
-    die->metadata = (dzDieMetadata) {
-        .pageCountPerDie = config.planeCountPerDie 
-                             * config.blockCountPerPlane
-                             * config.layerCountPerBlock,
-        .physicalPageSize = config.pageSizeInBytes 
-                             + dzPageGetMetadataSize()
-    };
+        die->metadata.pageCountPerDie = die->metadata.blockCountPerDie
+                                        * config.layerCountPerBlock;
 
-    // clang-format on
+        die->metadata.physicalPageSize = config.pageSizeInBytes
+                                         + dzPageGetMetadataSize();
+    }
 
     die->stats = (dzDieStatistics) { .totalProgramLatency = 0.0,
                                      .totalProgramCount = 0U,
@@ -147,7 +147,7 @@ bool dzDieProgramPage(dzDie *die, dzU64 ppn, const void *srcBuffer) {
         die->stats.totalProgramLatency += programLatency;
         die->stats.totalProgramCount++;
     }
-    
+
     (void) memcpy(pagePtr, srcBuffer, die->config.pageSizeInBytes);
 
     return true;

@@ -37,28 +37,28 @@ SUITE(dzTestUtils) {
 /* Private Functions ======================================================> */
 
 TEST dzTestGaussian(void) {
-    dzF32 samples[DZ_TEST_GAUSSIAN_MAX_COUNT], sampleMean = 0.0f;
+    dzF64 samples[DZ_TEST_GAUSSIAN_MAX_COUNT], sampleMean = 0.0;
 
     {
         for (int i = 0; i < DZ_TEST_GAUSSIAN_MAX_COUNT; i++) {
-            samples[i] = dzUtilsGaussian(0.0f, 1.0f);
+            samples[i] = dzUtilsGaussian(0.0, 1.0);
 
             sampleMean += samples[i];
         }
 
         sampleMean /= DZ_TEST_GAUSSIAN_MAX_COUNT;
 
-        ASSERT_IN_RANGE(0.0f, sampleMean, 1.0f);
+        ASSERT_IN_RANGE(0.0, sampleMean, 1.0);
     }
 
-    dzF32 kurtosis = 0.0f;
+    dzF64 kurtosis = 0.0;
 
     {
-        dzF32 kNumerator = 0.0f, kDenominator = 0.0f;
+        dzF64 kNumerator = 0.0, kDenominator = kNumerator;
 
         for (int i = 0; i < DZ_TEST_GAUSSIAN_MAX_COUNT; i++) {
-            dzF32 deviation = samples[i] - sampleMean;
-            dzF32 squaredDeviation = deviation * deviation;
+            dzF64 deviation = samples[i] - sampleMean;
+            dzF64 squaredDeviation = deviation * deviation;
 
             kDenominator += squaredDeviation;
             kNumerator += squaredDeviation * squaredDeviation;
@@ -69,7 +69,7 @@ TEST dzTestGaussian(void) {
 
         kurtosis = (kNumerator / (kDenominator * kDenominator));
 
-        ASSERT_IN_RANGE(3.0f, kurtosis, 1.0f);
+        ASSERT_IN_RANGE(3.0, kurtosis, 1.0);
     }
 
     PASS();

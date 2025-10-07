@@ -22,24 +22,68 @@
 
 /* Private Function Prototypes ============================================> */
 
-TEST dzTestDieRw(void);
+TEST dzTestPageOps(void);
 
 /* Public Functions =======================================================> */
 
 SUITE(dzTestDieOps) {
-    RUN_TEST(dzTestDieRw);
+    RUN_TEST(dzTestPageOps);
 }
 
 /* Private Functions ======================================================> */
 
-TEST dzTestDieRw(void) {
-    dzDie *die = dzDieCreate((dzDieConfig) { .cellType = DZ_CELL_TYPE_MLC,
-                                             .planeCountPerDie = 2U,
-                                             .blockCountPerPlane = 4U,
-                                             .layerCountPerBlock = 5U,
-                                             .pageSizeInBytes = 16U });
+TEST dzTestPageOps(void) {
+    dzDieConfig dieConfig = { .cellType = DZ_CELL_TYPE_MLC,
+                              .planeCountPerDie = 2U,
+                              .blockCountPerPlane = 4U,
+                              .layerCountPerBlock = 5U,
+                              .pageSizeInBytes = 16U };
 
-    // TODO: ...
+    dzDie *die = dzDieCreate(dieConfig);
+
+    {
+        dzU64 pageCount = dzDieGetPageCount(die);
+
+        // clang-format off
+
+        ASSERT_EQ(
+            (dieConfig.planeCountPerDie 
+                * dieConfig.blockCountPerPlane
+                * dieConfig.layerCountPerBlock),
+            pageCount
+        );
+
+        // clang-format on
+    }
+
+    {
+        // clang-format off
+
+        const dzByte srcBuffer[] = { 
+            0x12, 0x34, 0x56, 0x78, 0x91, 0x23, 0x45, 0x67,
+            0x89, 0x01, 0x23, 0x45, 0x67, 0x89, 0x01, 0x23
+        };
+
+        // clang-format on
+
+        for (dzU64 i = 0, j = dzDieGetPageCount(die); i < j; i++) {
+            ASSERT_EQ(true, dzDieProgramPage(die, i, srcBuffer));
+
+            // NOTE: This page is already programmed!
+            ASSERT_EQ(false, dzDieProgramPage(die, i, srcBuffer));
+        }
+
+        dzByte dstBuffer[sizeof srcBuffer];
+        
+        for (dzU64 i = 0, j = dzDieGetPageCount(die); i < j; i++) {
+            // NOTE: Making sure `dzDieReadPage()` is doing its job well
+            memset(dstBuffer, 0xFF, sizeof dstBuffer);
+
+            ASSERT_EQ(true, dzDieReadPage(die, i, dstBuffer));
+
+            ASSERT_MEM_EQ(srcBuffer, dstBuffer, sizeof srcBuffer);
+        }
+    }
 
     dzDieRelease(die);
 
