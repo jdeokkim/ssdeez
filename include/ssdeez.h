@@ -102,7 +102,7 @@ typedef double        dzF64;
 /* An enumeration that represents the type of a NAND flash cell. */
 typedef enum dzCellType_ {
     DZ_CELL_TYPE_UNKNOWN = -1,
-    DZ_CELL_TYPE_SLC,  // 1 voltage state
+    DZ_CELL_TYPE_SLC,  // 2 voltage states
     DZ_CELL_TYPE_MLC,  // 4 voltage states
     DZ_CELL_TYPE_TLC,  // 8 voltage states
     DZ_CELL_TYPE_QLC,  // 16 voltage states
@@ -135,7 +135,7 @@ typedef struct dzDie_ dzDie;
 
 /* A structure that represents the configuration of a NAND flash die. */
 typedef struct dzDieConfig_ {
-    // dzU64 dieId;
+    dzU64 dieId;
     dzCellType cellType;
     dzU32 planeCountPerDie;
     dzU32 blockCountPerPlane;
@@ -150,6 +150,12 @@ typedef struct dzDieMetadata_ dzDieMetadata;
 typedef struct dzDieStatistics_ dzDieStatistics;
 
 /* ========================================================================> */
+
+/* A structure that represents the configuration of a NAND flash block. */
+typedef struct dzBlockConfig_ {
+    dzU64 blockId;
+    // TODO: ...
+} dzBlockConfig;
 
 /* A structure that represents the metadata of a NAND flash block. */
 typedef struct dzBlockMetadata_ dzBlockMetadata;
@@ -168,18 +174,18 @@ typedef struct dzPageMetadata_ dzPageMetadata;
 
 /* Constants ==============================================================> */
 
-/* A constant that represents an invalid physical page number. */
-extern const dzU64 DZ_PAGE_INVALID_PPN;
+/* A constant that represents an invalid page identifier. */
+extern const dzU64 DZ_PAGE_INVALID_ID;
 
 /* Public Functions =======================================================> */
 
 /* <---------------------------------------------------------- [src/block.c] */
 
-/* Creates a block metadata with the given `blockId`. */
-dzBlockMetadata *dzBlockCreateMetadata(dzU64 blockId);
+/* Initializes a block metadata within the given `blockMetadataPtr`. */
+bool dzBlockInitMetadata(dzByte *blockMetadataPtr, dzBlockConfig config);
 
-/* Releases the memory allocated for `blockMetadata`. */
-void dzBlockReleaseMetadata(dzBlockMetadata *blockMetadata);
+/* Returns the size of `dzBlockMetadata`. */
+dzUSize dzBlockGetMetadataSize(void);
 
 /* <------------------------------------------------------------ [src/die.c] */
 
@@ -192,21 +198,24 @@ void dzDieRelease(dzDie *die);
 /* Returns the total number of pages in `die`. */
 dzU64 dzDieGetPageCount(const dzDie *die);
 
-/* Writes `srcBuffer` to the `ppn`-th page in `die`. */
-bool dzDieProgramPage(dzDie *die, dzU64 ppn, const void *srcBuffer);
+/* Writes `srcBuffer` to the `pageId`-th page in `die`. */
+bool dzDieProgramPage(dzDie *die, dzU64 pageId, const void *srcBuffer);
 
-/* Reads data from the `ppn`-th page in `die`, copying it to `dstBuffer`. */
-bool dzDieReadPage(dzDie *die, dzU64 ppn, void *dstBuffer);
+/* Reads data from the `pageId`-th page in `die`, copying it to `dstBuffer`. */
+bool dzDieReadPage(dzDie *die, dzU64 pageId, void *dstBuffer);
 
-/* Converts `pagePtr` to a physical page number. */
-dzU64 dzDiePagePtrToPPN(const dzDie *die, const dzByte *pagePtr);
+/* Erases the `blockId`-th block in `die`. */
+// bool dzDieEraseBlock(dzDie *die, dzU64 blockId);
 
-/* Converts `ppn` to a physical page address. */
-dzByte *dzDiePPNToPagePtr(const dzDie *die, dzU64 ppn);
+/* Returns the memory address of the `pageId`-th page in `die`. */
+dzByte *dzDiePageIdToPtr(const dzDie *die, dzU64 pageId);
+
+/* Returns the `die`-local page identifier corresponding to `pagePtr`. */
+dzU64 dzDiePagePtrToId(const dzDie *die, const dzByte *pagePtr);
 
 /* <------------------------------------------------------------ [src/page.c] */
 
-/* Initializes a page metadata object within the given `pagePtr`. */
+/* Initializes a page metadata within the given `pagePtr`. */
 bool dzPageInitMetadata(dzByte *pagePtr, dzPageConfig config);
 
 /* Returns the size of `dzPageMetadata`. */

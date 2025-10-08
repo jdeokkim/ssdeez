@@ -27,7 +27,6 @@
 
 /* A structure that represents the metadata of a NAND flash page. */
 struct dzPageMetadata_ {
-    dzU64 logicalPageAddress;
     dzU64 totalProgramCount;
     dzU64 totalReadCount;
     /// dzF64 lastProgramTime;
@@ -66,11 +65,8 @@ static const dzF64 readLatencyTable[DZ_CELL_TYPE_COUNT_] = {
 
 /* ========================================================================> */
 
-/* A constant that represents an invalid logical page number. */
-const dzU64 DZ_PAGE_INVALID_LPN = UINT64_MAX;
-
-/* A constant that represents an invalid physical page number. */
-const dzU64 DZ_PAGE_INVALID_PPN = UINT64_MAX;
+/* A constant that represents an invalid page identifier. */
+const dzU64 DZ_PAGE_INVALID_ID = UINT64_MAX;
 
 /* Private Variables ======================================================> */
 
@@ -92,8 +88,6 @@ bool dzPageInitMetadata(dzByte *pagePtr, dzPageConfig config) {
         (dzPageMetadata *) (pagePtr + config.pageSizeInBytes);
 
     {
-        pageMetadata->logicalPageAddress = DZ_PAGE_INVALID_LPN;
-
         pageMetadata->totalProgramCount = 0U;
         pageMetadata->totalReadCount = 0U;
 

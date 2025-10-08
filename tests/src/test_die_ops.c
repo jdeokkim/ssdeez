@@ -74,7 +74,7 @@ TEST dzTestPageOps(void) {
         }
 
         dzByte dstBuffer[sizeof srcBuffer];
-        
+
         for (dzU64 i = 0, j = dzDieGetPageCount(die); i < j; i++) {
             // NOTE: Making sure `dzDieReadPage()` is doing its job well
             memset(dstBuffer, 0xFF, sizeof dstBuffer);

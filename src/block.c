@@ -23,7 +23,8 @@
 
 /* A structure that represents the metadata of a NAND flash block. */
 struct dzBlockMetadata_ {
-    dzU64 blockId;
+    dzBlockConfig config;
+    dzU64 totalEraseCount;
     // dzF64 lastEraseTime;
     // TODO: ...
 };
@@ -47,16 +48,22 @@ const dzU64 DZ_BLOCK_INVALID_ID = UINT64_MAX;
 
 /* Public Functions =======================================================> */
 
-/* Creates a block metadata with the given `blockId`. */
-dzBlockMetadata *dzBlockCreateMetadata(dzU64 blockId) {
-    dzBlockMetadata *blockMetadata = malloc(sizeof *blockMetadata);
+/* Initializes a block metadata within the given `blockMetadataPtr`. */
+bool dzBlockInitMetadata(dzByte *blockMetadataPtr, dzBlockConfig config) {
+    if (blockMetadataPtr == NULL) return false;
 
-    blockMetadata->blockId = blockId;
+    dzBlockMetadata *blockMetadata = (dzBlockMetadata *) blockMetadataPtr;
 
-    return blockMetadata;
+    blockMetadata->config = config;
+
+    blockMetadata->totalEraseCount = 0U;
+
+    // blockMetadata->lastEraseTime = 0.0;
+
+    return true;
 }
 
-/* Releases the memory allocated for `blockMetadata`. */
-void dzBlockReleaseMetadata(dzBlockMetadata *blockMetadata) {
-    free(blockMetadata);
+/* Returns the size of `dzBlockMetadata`. */
+dzUSize dzBlockGetMetadataSize(void) {
+    return sizeof(dzBlockMetadata);
 }

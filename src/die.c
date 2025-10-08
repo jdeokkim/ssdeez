@@ -55,8 +55,9 @@ struct dzDieStatistics_ {
 /* A structure that represents a group of NAND flash planes. */
 struct dzDie_ {
     dzDieConfig config;
-    dzDieMetadata metadata;
     dzDieStatistics stats;
+    dzDieMetadata metadata;
+    dzBlockMetadata *blockMetadata;
     dzByte *buffer;
     // TODO: ...
 };
@@ -74,12 +75,12 @@ static dzByte *dzDieCreateBuffer(dzDieConfig config, dzDieMetadata metadata);
 static DZ_API_INLINE bool dzDieIsValidPagePtr_(const dzDie *die,
                                                const dzByte *pagePtr);
 
-/* Converts `pagePtr` to a physical page number. */
-static DZ_API_INLINE dzU64 dzDiePagePtrToPPN_(const dzDie *die,
-                                              const dzByte *pagePtr);
+/* Returns the memory address of the `pageId`-th page in `die`. */
+static DZ_API_INLINE dzByte *dzDiePageIdToPtr_(const dzDie *die, dzU64 pageId);
 
-/* Converts `ppn` to a physical page address. */
-static DZ_API_INLINE dzByte *dzDiePPNToPagePtr_(const dzDie *die, dzU64 ppn);
+/* Returns the `die`-local page identifier corresponding to `pagePtr`. */
+static DZ_API_INLINE dzU64 dzDiePagePtrToId_(const dzDie *die,
+                                             const dzByte *pagePtr);
 
 /* Public Functions =======================================================> */
 
@@ -90,6 +91,11 @@ dzDie *dzDieCreate(dzDieConfig config) {
     if (die == NULL) return die;
 
     die->config = config;
+
+    die->stats = (dzDieStatistics) { .totalProgramLatency = 0.0,
+                                     .totalProgramCount = 0U,
+                                     .totalReadLatency = 0.0,
+                                     .totalReadCount = 0U };
 
     {
         die->metadata.blockCountPerDie = config.planeCountPerDie
@@ -102,10 +108,25 @@ dzDie *dzDieCreate(dzDieConfig config) {
                                          + dzPageGetMetadataSize();
     }
 
-    die->stats = (dzDieStatistics) { .totalProgramLatency = 0.0,
-                                     .totalProgramCount = 0U,
-                                     .totalReadLatency = 0.0,
-                                     .totalReadCount = 0U };
+    {
+        dzUSize blockMetadataSize = dzBlockGetMetadataSize();
+
+        die->blockMetadata = malloc(die->metadata.blockCountPerDie
+                                    * blockMetadataSize);
+
+        for (dzU64 i = 0U; i < die->metadata.blockCountPerDie; i++) {
+            dzByte *blockMetadataPtr = ((dzByte *) die->blockMetadata)
+                                       + (i * blockMetadataSize);
+
+            dzBlockConfig blockConfig = { .blockId = i };
+
+            if (!dzBlockInitMetadata(blockMetadataPtr, blockConfig)) {
+                dzDieRelease(die);
+
+                return NULL;
+            }
+        }
+    }
 
     if ((die->buffer = dzDieCreateBuffer(config, die->metadata)) == NULL) {
         dzDieRelease(die);
@@ -120,7 +141,7 @@ dzDie *dzDieCreate(dzDieConfig config) {
 void dzDieRelease(dzDie *die) {
     if (die == NULL) return;
 
-    free(die->buffer), free(die);
+    free(die->blockMetadata), free(die->buffer), free(die);
 }
 
 /* Returns the total number of pages in `die`. */
@@ -128,9 +149,9 @@ dzU64 dzDieGetPageCount(const dzDie *die) {
     return (die != NULL) ? die->metadata.pageCountPerDie : 0U;
 }
 
-/* Writes `srcBuffer` to the `ppn`-th page in `die`. */
-bool dzDieProgramPage(dzDie *die, dzU64 ppn, const void *srcBuffer) {
-    dzByte *pagePtr = dzDiePPNToPagePtr_(die, ppn);
+/* Writes `srcBuffer` to the `pageId`-th page in `die`. */
+bool dzDieProgramPage(dzDie *die, dzU64 pageId, const void *srcBuffer) {
+    dzByte *pagePtr = dzDiePageIdToPtr_(die, pageId);
 
     if (pagePtr == NULL || srcBuffer == NULL) return false;
 
@@ -153,9 +174,9 @@ bool dzDieProgramPage(dzDie *die, dzU64 ppn, const void *srcBuffer) {
     return true;
 }
 
-/* Reads data from the `ppn`-th page in `die`, copying it to `dstBuffer`. */
-bool dzDieReadPage(dzDie *die, dzU64 ppn, void *dstBuffer) {
-    dzByte *pagePtr = dzDiePPNToPagePtr_(die, ppn);
+/* Reads data from the `pageId`-th page in `die`, copying it to `dstBuffer`. */
+bool dzDieReadPage(dzDie *die, dzU64 pageId, void *dstBuffer) {
+    dzByte *pagePtr = dzDiePageIdToPtr_(die, pageId);
 
     if (pagePtr == NULL || dstBuffer == NULL) return false;
 
@@ -177,14 +198,14 @@ bool dzDieReadPage(dzDie *die, dzU64 ppn, void *dstBuffer) {
     return true;
 }
 
-/* Converts `pagePtr` to a physical page number. */
-dzU64 dzDiePagePtrToPPN(const dzDie *die, const dzByte *pagePtr) {
-    return dzDiePagePtrToPPN_(die, pagePtr);
+/* Returns the memory address of the `pageId`-th page in `die`. */
+dzByte *dzDiePageIdToPtr(const dzDie *die, dzU64 pageId) {
+    return dzDiePageIdToPtr_(die, pageId);
 }
 
-/* Converts `ppn` to a physical page address. */
-dzByte *dzDiePPNToPagePtr(const dzDie *die, dzU64 ppn) {
-    return dzDiePPNToPagePtr_(die, ppn);
+/* Returns the `die`-local page identifier corresponding to `pagePtr`. */
+dzU64 dzDiePagePtrToId(const dzDie *die, const dzByte *pagePtr) {
+    return dzDiePagePtrToId_(die, pagePtr);
 }
 
 /* Private Functions ======================================================> */
@@ -197,6 +218,7 @@ static dzByte *dzDieCreateBuffer(dzDieConfig config, dzDieMetadata metadata) {
 
     if ((result = malloc(bufferSize * sizeof *result)) == NULL) return result;
 
+    // NOTE: Simulating the 'erased' state by setting all bits to `1`
     (void) memset(result, 0xFF, config.pageSizeInBytes);
 
     dzU64 pageIndex = 0U, centerPageIndex = metadata.pageCountPerDie >> 1;
@@ -248,21 +270,22 @@ static DZ_API_INLINE bool dzDieIsValidPagePtr_(const dzDie *die,
     return (pagePtr >= firstPagePtr && pagePtr < lastPagePtr);
 }
 
-/* Converts `pagePtr` to a physical page number. */
-static DZ_API_INLINE dzU64 dzDiePagePtrToPPN_(const dzDie *die,
-                                              const dzByte *pagePtr) {
-    if (!dzDieIsValidPagePtr_(die, pagePtr)) return DZ_PAGE_INVALID_PPN;
+/* Returns the `die`-local page identifier corresponding to `pagePtr`. */
+static DZ_API_INLINE dzU64 dzDiePagePtrToId_(const dzDie *die,
+                                             const dzByte *pagePtr) {
+    if (!dzDieIsValidPagePtr_(die, pagePtr)) return DZ_PAGE_INVALID_ID;
 
     dzU64 ptrOffset = (dzU64) (pagePtr - die->buffer);
 
     return ptrOffset / die->metadata.physicalPageSize;
 }
 
-/* Converts `ppn` to a physical page address. */
-static DZ_API_INLINE dzByte *dzDiePPNToPagePtr_(const dzDie *die, dzU64 ppn) {
+/* Returns the memory address of the `pageId`-th page in `die`. */
+static DZ_API_INLINE dzByte *dzDiePageIdToPtr_(const dzDie *die,
+                                               dzU64 pageId) {
     if (die == NULL || die->buffer == NULL
-        || ppn >= die->metadata.pageCountPerDie)
+        || pageId >= die->metadata.pageCountPerDie)
         return NULL;
 
-    return die->buffer + (ppn * die->metadata.physicalPageSize);
+    return die->buffer + (pageId * die->metadata.physicalPageSize);
 }
