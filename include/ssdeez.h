@@ -99,16 +99,6 @@ typedef double        dzF64;
 
 /* ========================================================================> */
 
-/* An enumeration that represents the type of a NAND flash cell. */
-typedef enum dzCellType_ {
-    DZ_CELL_TYPE_UNKNOWN = -1,
-    DZ_CELL_TYPE_SLC,  // 2 voltage states
-    DZ_CELL_TYPE_MLC,  // 4 voltage states
-    DZ_CELL_TYPE_TLC,  // 8 voltage states
-    DZ_CELL_TYPE_QLC,  // 16 voltage states
-    DZ_CELL_TYPE_COUNT_
-} dzCellType;
-
 /* An enumeration that represents the state of a NAND flash page. */
 typedef enum dzPageState_ {
     DZ_PAGE_STATE_UNKNOWN = -1,
@@ -120,13 +110,15 @@ typedef enum dzPageState_ {
     DZ_PAGE_STATE_COUNT_
 } dzPageState;
 
-/* ========================================================================> */
-
-/* 
-    A structure that represents an interface between the controller 
-    and a group of dies. 
-*/
-typedef struct dzChannel_ dzChannel;
+/* An enumeration that represents the type of a NAND flash cell. */
+typedef enum dzCellType_ {
+    DZ_CELL_TYPE_UNKNOWN = -1,
+    DZ_CELL_TYPE_SLC,  // 2 voltage states
+    DZ_CELL_TYPE_MLC,  // 4 voltage states
+    DZ_CELL_TYPE_TLC,  // 8 voltage states
+    DZ_CELL_TYPE_QLC,  // 16 voltage states
+    DZ_CELL_TYPE_COUNT_
+} dzCellType;
 
 /* ========================================================================> */
 
@@ -139,7 +131,7 @@ typedef struct dzDieConfig_ {
     dzCellType cellType;
     dzU32 planeCountPerDie;
     dzU32 blockCountPerPlane;
-    dzU32 layerCountPerBlock;
+    dzU32 pageCountPerBlock;
     dzU32 pageSizeInBytes;
 } dzDieConfig;
 
@@ -174,6 +166,9 @@ typedef struct dzPageMetadata_ dzPageMetadata;
 
 /* Constants ==============================================================> */
 
+/* A constant that represents an invalid block identifier. */
+extern const dzU64 DZ_BLOCK_INVALID_ID;
+
 /* A constant that represents an invalid page identifier. */
 extern const dzU64 DZ_PAGE_INVALID_ID;
 
@@ -205,7 +200,7 @@ bool dzDieProgramPage(dzDie *die, dzU64 pageId, const void *srcBuffer);
 bool dzDieReadPage(dzDie *die, dzU64 pageId, void *dstBuffer);
 
 /* Erases the `blockId`-th block in `die`. */
-// bool dzDieEraseBlock(dzDie *die, dzU64 blockId);
+bool dzDieEraseBlock(dzDie *die, dzU64 blockId);
 
 /* Returns the memory address of the `pageId`-th page in `die`. */
 dzByte *dzDiePageIdToPtr(const dzDie *die, dzU64 pageId);
@@ -226,25 +221,21 @@ bool dzPageGetReadLatency(const dzByte *pagePtr,
                           dzU32 pageSizeInBytes,
                           dzF64 *readLatency);
 
+/* Marks a page as corrupted. */
+bool dzPageMarkAsCorrupted(dzByte *pagePtr, dzU32 pageSizeInBytes);
+
+/* Marks a page as free. */
+bool dzPageMarkAsFree(dzByte *pagePtr, dzU32 pageSizeInBytes);
+
 /* Marks a page as valid. */
 bool dzPageMarkAsValid(dzByte *pagePtr,
                        dzU32 pageSizeInBytes,
                        dzF64 *programLatency);
 
-/* Marks a page as free. */
-bool dzPageMarkAsFree(dzByte *pagePtr, dzU32 pageSizeInBytes);
-
 /* <---------------------------------------------------------- [src/utils.c] */
 
 /* Returns a pseudo-random number from a Gaussian distribution. */
 dzF64 dzUtilsGaussian(dzF64 mu, dzF64 sigma);
-
-/* Inline Functions =======================================================> */
-
-/* Returns `true` if `cellType` is a valid NAND flash cell type. */
-DZ_API_INLINE bool dzIsValidCellType(dzCellType cellType) {
-    return (cellType > DZ_CELL_TYPE_UNKNOWN && cellType < DZ_CELL_TYPE_COUNT_);
-}
 
 /* ========================================================================> */
 

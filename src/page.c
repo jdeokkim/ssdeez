@@ -74,7 +74,8 @@ const dzU64 DZ_PAGE_INVALID_ID = UINT64_MAX;
 
 /* Private Function Prototypes ============================================> */
 
-// TODO: ...
+/* Returns `true` if `cellType` is a valid NAND flash cell type. */
+static DZ_API_INLINE bool dzIsValidCellType(dzCellType cellType);
 
 /* Public Functions =======================================================> */
 
@@ -141,26 +142,17 @@ bool dzPageGetReadLatency(const dzByte *pagePtr,
     return true;
 }
 
-/* Marks a page as valid. */
-bool dzPageMarkAsValid(dzByte *pagePtr,
-                       dzU32 pageSizeInBytes,
-                       dzF64 *programLatency) {
-    if (pagePtr == NULL || pageSizeInBytes == 0U || programLatency == NULL)
-        return false;
+/* Marks a page as corrupted. */
+bool dzPageMarkAsCorrupted(dzByte *pagePtr, dzU32 pageSizeInBytes) {
+    if (pagePtr == NULL || pageSizeInBytes == 0U) return false;
 
     dzPageMetadata *pageMetadata = (dzPageMetadata *) (pagePtr
                                                        + pageSizeInBytes);
 
-    if (pageMetadata->state != DZ_PAGE_STATE_FREE) return false;
+    // NOTE: Free blocks can never be corrupted
+    if (pageMetadata->state == DZ_PAGE_STATE_FREE) return false;
 
-    pageMetadata->totalProgramCount++;
-
-    pageMetadata->state = DZ_PAGE_STATE_VALID;
-
-    *programLatency =
-        dzUtilsGaussian(programLatencyTable[pageMetadata->cellType],
-                        DZ_PAGE_PROGRAM_LATENCY_STDDEV_RATIO
-                            * programLatencyTable[pageMetadata->cellType]);
+    pageMetadata->state = DZ_PAGE_STATE_CORRUPTED;
 
     return true;
 }
@@ -185,6 +177,33 @@ bool dzPageMarkAsFree(dzByte *pagePtr, dzU32 pageSizeInBytes) {
     return true;
 }
 
+/* Marks a page as valid. */
+bool dzPageMarkAsValid(dzByte *pagePtr,
+                       dzU32 pageSizeInBytes,
+                       dzF64 *programLatency) {
+    if (pagePtr == NULL || pageSizeInBytes == 0U || programLatency == NULL)
+        return false;
+
+    dzPageMetadata *pageMetadata = (dzPageMetadata *) (pagePtr
+                                                       + pageSizeInBytes);
+
+    if (pageMetadata->state != DZ_PAGE_STATE_FREE) return false;
+
+    pageMetadata->totalProgramCount++;
+
+    pageMetadata->state = DZ_PAGE_STATE_VALID;
+
+    *programLatency =
+        dzUtilsGaussian(programLatencyTable[pageMetadata->cellType],
+                        DZ_PAGE_PROGRAM_LATENCY_STDDEV_RATIO
+                            * programLatencyTable[pageMetadata->cellType]);
+
+    return true;
+}
+
 /* Private Functions ======================================================> */
 
-// TODO: ...
+/* Returns `true` if `cellType` is a valid NAND flash cell type. */
+static DZ_API_INLINE bool dzIsValidCellType(dzCellType cellType) {
+    return (cellType > DZ_CELL_TYPE_UNKNOWN && cellType < DZ_CELL_TYPE_COUNT_);
+}

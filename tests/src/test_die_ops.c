@@ -36,7 +36,7 @@ TEST dzTestPageOps(void) {
     dzDieConfig dieConfig = { .cellType = DZ_CELL_TYPE_MLC,
                               .planeCountPerDie = 2U,
                               .blockCountPerPlane = 4U,
-                              .layerCountPerBlock = 5U,
+                              .pageCountPerBlock = 5U,
                               .pageSizeInBytes = 16U };
 
     dzDie *die = dzDieCreate(dieConfig);
@@ -49,7 +49,7 @@ TEST dzTestPageOps(void) {
         ASSERT_EQ(
             (dieConfig.planeCountPerDie 
                 * dieConfig.blockCountPerPlane
-                * dieConfig.layerCountPerBlock),
+                * dieConfig.pageCountPerBlock),
             pageCount
         );
 

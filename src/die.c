@@ -24,7 +24,7 @@
 
 /* Macros =================================================================> */
 
-#define dzDiePageForEach(dieBuffer, dieMetadata, ptrIdentifier) \
+#define dzDieForEachPage(dieBuffer, dieMetadata, ptrIdentifier) \
     for (dzByte *ptrIdentifier = (dieBuffer),                   \
                 *ptrIdentifier##__LINE__ =                      \
                     (dieBuffer)                                 \
@@ -33,12 +33,25 @@
          ptrIdentifier < ptrIdentifier##__LINE__;               \
          ptrIdentifier += (dieMetadata).physicalPageSize)
 
+#define dzDieForEachPageInBlock(dieBuffer,                                    \
+                                dieMetadata,                                  \
+                                blockId,                                      \
+                                ptrIdentifier)                                \
+    for (dzByte *ptrIdentifier =                                              \
+             (dieBuffer) + ((blockId) * ((dieMetadata).physicalBlockSize)),   \
+                *ptrIdentifier##__LINE__ =                                    \
+                    (dieBuffer)                                               \
+                    + (((blockId) + 1U) * ((dieMetadata).physicalBlockSize)); \
+         ptrIdentifier < ptrIdentifier##__LINE__;                             \
+         ptrIdentifier += (dieMetadata).physicalPageSize)
+
 /* Typedefs ===============================================================> */
 
 /* A structure that represents the metadata of a NAND flash die. */
 struct dzDieMetadata_ {
     dzU64 blockCountPerDie;
     dzU64 pageCountPerDie;
+    dzU64 physicalBlockSize;
     dzU64 physicalPageSize;
     // TODO: ...
 };
@@ -71,10 +84,6 @@ struct dzDie_ {
 /* Creates a die buffer with the given `config` and `metadata`. */
 static dzByte *dzDieCreateBuffer(dzDieConfig config, dzDieMetadata metadata);
 
-/* Returns `true` if `pagePtr` is pointing to a valid page in `die`. */
-static DZ_API_INLINE bool dzDieIsValidPagePtr_(const dzDie *die,
-                                               const dzByte *pagePtr);
-
 /* Returns the memory address of the `pageId`-th page in `die`. */
 static DZ_API_INLINE dzByte *dzDiePageIdToPtr_(const dzDie *die, dzU64 pageId);
 
@@ -102,10 +111,13 @@ dzDie *dzDieCreate(dzDieConfig config) {
                                          * config.blockCountPerPlane;
 
         die->metadata.pageCountPerDie = die->metadata.blockCountPerDie
-                                        * config.layerCountPerBlock;
+                                        * config.pageCountPerBlock;
 
         die->metadata.physicalPageSize = config.pageSizeInBytes
                                          + dzPageGetMetadataSize();
+
+        die->metadata.physicalBlockSize = config.pageCountPerBlock
+                                          * die->metadata.physicalPageSize;
     }
 
     {
@@ -198,6 +210,15 @@ bool dzDieReadPage(dzDie *die, dzU64 pageId, void *dstBuffer) {
     return true;
 }
 
+/* Erases the `blockId`-th block in `die`. */
+bool dzDieEraseBlock(dzDie *die, dzU64 blockId) {
+    if (die == NULL || blockId >= die->metadata.blockCountPerDie) return false;
+
+    // TODO: ...
+
+    return true;
+}
+
 /* Returns the memory address of the `pageId`-th page in `die`. */
 dzByte *dzDiePageIdToPtr(const dzDie *die, dzU64 pageId) {
     return dzDiePageIdToPtr_(die, pageId);
@@ -223,7 +244,7 @@ static dzByte *dzDieCreateBuffer(dzDieConfig config, dzDieMetadata metadata) {
 
     dzU64 pageIndex = 0U, centerPageIndex = metadata.pageCountPerDie >> 1;
 
-    dzDiePageForEach(result, metadata, pagePtr) {
+    dzDieForEachPage(result, metadata, pagePtr) {
         dzF64 peCycleCountPenalty = 1.0;
 
         // NOTE: Pages in the top and bottom layers should have lower endurance
@@ -257,23 +278,17 @@ static dzByte *dzDieCreateBuffer(dzDieConfig config, dzDieMetadata metadata) {
     return result;
 }
 
-/* Returns `true` if `pagePtr` is pointing to a valid page in `die`. */
-static DZ_API_INLINE bool dzDieIsValidPagePtr_(const dzDie *die,
-                                               const dzByte *pagePtr) {
-    if (die == NULL || pagePtr == NULL) return false;
-
-    const dzByte *firstPagePtr = die->buffer;
-    const dzByte *lastPagePtr = firstPagePtr
-                                + (die->metadata.pageCountPerDie
-                                   * die->metadata.physicalPageSize);
-
-    return (pagePtr >= firstPagePtr && pagePtr < lastPagePtr);
-}
-
 /* Returns the `die`-local page identifier corresponding to `pagePtr`. */
 static DZ_API_INLINE dzU64 dzDiePagePtrToId_(const dzDie *die,
                                              const dzByte *pagePtr) {
-    if (!dzDieIsValidPagePtr_(die, pagePtr)) return DZ_PAGE_INVALID_ID;
+    if (die == NULL || pagePtr == NULL) return false;
+
+    const dzByte *nextPagePtr = die->buffer
+                                + (die->metadata.pageCountPerDie
+                                   * die->metadata.physicalPageSize);
+
+    if (pagePtr < die->buffer || pagePtr >= nextPagePtr)
+        return DZ_PAGE_INVALID_ID;
 
     dzU64 ptrOffset = (dzU64) (pagePtr - die->buffer);
 
