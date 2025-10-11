@@ -51,6 +51,9 @@ extern "C" {
 
 // clang-format off
 
+/* Specifies the standard deviation ratio for the erase latency. */
+#define DZ_BLOCK_ERASE_LATENCY_STDDEV_RATIO    0.1
+
 /*
     Specifies how much space the OOB (Out-Of-Band) area takes up,
     in relation to the total page size.
@@ -69,10 +72,10 @@ extern "C" {
 */
 #define DZ_PAGE_PE_CYCLE_COUNT_STDDEV_RATIO    0.1
 
-/* Specifies the standard deviation ratio for the program latency of a page. */
+/* Specifies the standard deviation ratio for the program latency. */
 #define DZ_PAGE_PROGRAM_LATENCY_STDDEV_RATIO   0.1
 
-/* Specifies the standard deviation ratio for the read latency of a page. */
+/* Specifies the standard deviation ratio for the read latency. */
 #define DZ_PAGE_READ_LATENCY_STDDEV_RATIO      0.1
 
 /* Typedefs ===============================================================> */
@@ -99,13 +102,22 @@ typedef double        dzF64;
 
 /* ========================================================================> */
 
+/* An enumeration that represents the state of a NAND flash block. */
+typedef enum dzBlockState_ {
+    DZ_BLOCK_STATE_UNKNOWN = -1,
+    DZ_BLOCK_STATE_FREE,
+    DZ_BLOCK_STATE_VALID,
+    DZ_BLOCK_STATE_BAD,
+    DZ_BLOCK_STATE_RESERVED,
+    DZ_BLOCK_STATE_COUNT_
+} dzBlockState;
+
 /* An enumeration that represents the state of a NAND flash page. */
 typedef enum dzPageState_ {
     DZ_PAGE_STATE_UNKNOWN = -1,
     DZ_PAGE_STATE_FREE,
     DZ_PAGE_STATE_VALID,
-    DZ_PAGE_STATE_INVALID,
-    DZ_PAGE_STATE_CORRUPTED,
+    DZ_PAGE_STATE_BAD,
     DZ_PAGE_STATE_RESERVED,
     DZ_PAGE_STATE_COUNT_
 } dzPageState;
@@ -146,6 +158,7 @@ typedef struct dzDieStatistics_ dzDieStatistics;
 /* A structure that represents the configuration of a NAND flash block. */
 typedef struct dzBlockConfig_ {
     dzU64 blockId;
+    dzCellType cellType;
     // TODO: ...
 } dzBlockConfig;
 
@@ -156,9 +169,9 @@ typedef struct dzBlockMetadata_ dzBlockMetadata;
 
 /* A structure that represents the configuration of a NAND flash page. */
 typedef struct dzPageConfig_ {
-    dzCellType cellType;
-    dzU32 pageSizeInBytes;
     dzF64 peCycleCountPenalty;
+    dzU32 pageSizeInBytes;
+    dzCellType cellType;
 } dzPageConfig;
 
 /* A structure that represents the metadata of a NAND flash page. */
@@ -176,11 +189,23 @@ extern const dzU64 DZ_PAGE_INVALID_ID;
 
 /* <---------------------------------------------------------- [src/block.c] */
 
-/* Initializes a block metadata within the given `blockMetadataPtr`. */
-bool dzBlockInitMetadata(dzByte *blockMetadataPtr, dzBlockConfig config);
+/* Initializes a block metadata within the given `blockMetadata`. */
+bool dzBlockInitMetadata(dzBlockMetadata *blockMetadata, dzBlockConfig config);
 
 /* Returns the size of `dzBlockMetadata`. */
 dzUSize dzBlockGetMetadataSize(void);
+
+/* Returns the current state of a block. */
+dzBlockState dzBlockGetState(dzBlockMetadata *blockMetadata);
+
+/* Marks a block as bad. */
+bool dzBlockMarkAsBad(dzBlockMetadata *blockMetadata);
+
+/* Marks a block as free. */
+bool dzBlockMarkAsFree(dzBlockMetadata *blockMetadata, dzF64 *eraseLatency);
+
+/* Marks a block as valid. */
+bool dzBlockMarkAsValid(dzBlockMetadata *blockMetadata);
 
 /* <------------------------------------------------------------ [src/die.c] */
 
@@ -189,6 +214,9 @@ dzDie *dzDieCreate(dzDieConfig config);
 
 /* Releases the memory allocated for the `die`. */
 void dzDieRelease(dzDie *die);
+
+/* Returns the total number of blocks in `die`. */
+dzU64 dzDieGetBlockCount(const dzDie *die);
 
 /* Returns the total number of pages in `die`. */
 dzU64 dzDieGetPageCount(const dzDie *die);
@@ -216,13 +244,16 @@ bool dzPageInitMetadata(dzByte *pagePtr, dzPageConfig config);
 /* Returns the size of `dzPageMetadata`. */
 dzUSize dzPageGetMetadataSize(void);
 
+/* Returns the current state of a page. */
+dzPageState dzPageGetState(const dzByte *pagePtr, dzU32 pageSizeInBytes);
+
 /* Returns the read latency of a page. */
 bool dzPageGetReadLatency(const dzByte *pagePtr,
                           dzU32 pageSizeInBytes,
                           dzF64 *readLatency);
 
-/* Marks a page as corrupted. */
-bool dzPageMarkAsCorrupted(dzByte *pagePtr, dzU32 pageSizeInBytes);
+/* Marks a page as bad. */
+bool dzPageMarkAsBad(dzByte *pagePtr, dzU32 pageSizeInBytes);
 
 /* Marks a page as free. */
 bool dzPageMarkAsFree(dzByte *pagePtr, dzU32 pageSizeInBytes);

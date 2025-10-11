@@ -62,6 +62,8 @@ struct dzDieStatistics_ {
     dzU64 totalProgramCount;
     dzF64 totalReadLatency;
     dzU64 totalReadCount;
+    dzF64 totalEraseLatency;
+    dzU64 totalEraseCount;
     // TODO: ...
 };
 
@@ -127,12 +129,14 @@ dzDie *dzDieCreate(dzDieConfig config) {
                                     * blockMetadataSize);
 
         for (dzU64 i = 0U; i < die->metadata.blockCountPerDie; i++) {
-            dzByte *blockMetadataPtr = ((dzByte *) die->blockMetadata)
-                                       + (i * blockMetadataSize);
+            dzBlockMetadata *blockMetadata =
+                (dzBlockMetadata *) (((dzByte *) die->blockMetadata)
+                                     + (i * blockMetadataSize));
 
-            dzBlockConfig blockConfig = { .blockId = i };
+            dzBlockConfig blockConfig = { .blockId = i,
+                                          .cellType = die->config.cellType };
 
-            if (!dzBlockInitMetadata(blockMetadataPtr, blockConfig)) {
+            if (!dzBlockInitMetadata(blockMetadata, blockConfig)) {
                 dzDieRelease(die);
 
                 return NULL;
@@ -154,6 +158,11 @@ void dzDieRelease(dzDie *die) {
     if (die == NULL) return;
 
     free(die->blockMetadata), free(die->buffer), free(die);
+}
+
+/* Returns the total number of blocks in `die`. */
+dzU64 dzDieGetBlockCount(const dzDie *die) {
+    return (die != NULL) ? die->metadata.blockCountPerDie : 0U;
 }
 
 /* Returns the total number of pages in `die`. */
@@ -182,6 +191,8 @@ bool dzDieProgramPage(dzDie *die, dzU64 pageId, const void *srcBuffer) {
     }
 
     (void) memcpy(pagePtr, srcBuffer, die->config.pageSizeInBytes);
+
+    // TODO: dzBlockMarkAsValid() 
 
     return true;
 }
@@ -214,9 +225,46 @@ bool dzDieReadPage(dzDie *die, dzU64 pageId, void *dstBuffer) {
 bool dzDieEraseBlock(dzDie *die, dzU64 blockId) {
     if (die == NULL || blockId >= die->metadata.blockCountPerDie) return false;
 
-    // TODO: ...
+    bool result = true;
 
-    return true;
+    dzDieForEachPageInBlock(die->buffer, die->metadata, blockId, pagePtr) {
+        (void) memset(pagePtr, 0xFF, die->config.pageSizeInBytes);
+
+        if (!dzPageMarkAsFree(pagePtr, die->config.pageSizeInBytes)) {
+            result = false;
+
+            break;
+        }
+    }
+
+    dzBlockMetadata *blockMetadata =
+        (dzBlockMetadata *) (((dzByte *) die->blockMetadata)
+                             + (blockId * dzBlockGetMetadataSize()));
+
+    if (!result) {
+        /* NOTE: Mark all pages in the block as bad */
+
+        dzDieForEachPageInBlock(die->buffer, die->metadata, blockId, pagePtr) {
+            (void) dzPageMarkAsBad(pagePtr, die->config.pageSizeInBytes);
+        }
+
+        (void) dzBlockMarkAsBad(blockMetadata);
+
+        return result;
+    }
+
+    {
+        dzF64 eraseLatency = -DBL_MAX;
+
+        if (!dzBlockMarkAsFree(blockMetadata, &eraseLatency)
+            || (eraseLatency < 0.0))
+            return false;
+
+        die->stats.totalEraseLatency += eraseLatency;
+        die->stats.totalEraseCount++;
+    }
+
+    return result;
 }
 
 /* Returns the memory address of the `pageId`-th page in `die`. */

@@ -85,6 +85,11 @@ TEST dzTestPageOps(void) {
         }
     }
 
+    {
+        for (dzU64 i = 0, j = dzDieGetBlockCount(die); i < j; i++)
+            ASSERT_EQ(true, dzDieEraseBlock(die, i));
+    }
+
     dzDieRelease(die);
 
     PASS();

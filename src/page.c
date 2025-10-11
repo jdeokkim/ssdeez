@@ -125,6 +125,16 @@ dzUSize dzPageGetMetadataSize(void) {
     return sizeof(dzPageMetadata);
 }
 
+/* Returns the current state of a page. */
+dzPageState dzPageGetState(const dzByte *pagePtr, dzU32 pageSizeInBytes) {
+    if (pagePtr == NULL) return DZ_PAGE_STATE_UNKNOWN;
+
+    dzPageMetadata *pageMetadata = (dzPageMetadata *) (pagePtr
+                                                       + pageSizeInBytes);
+
+    return pageMetadata->state;
+}
+
 /* Returns the read latency of a page. */
 bool dzPageGetReadLatency(const dzByte *pagePtr,
                           dzU32 pageSizeInBytes,
@@ -142,8 +152,8 @@ bool dzPageGetReadLatency(const dzByte *pagePtr,
     return true;
 }
 
-/* Marks a page as corrupted. */
-bool dzPageMarkAsCorrupted(dzByte *pagePtr, dzU32 pageSizeInBytes) {
+/* Marks a page as bad. */
+bool dzPageMarkAsBad(dzByte *pagePtr, dzU32 pageSizeInBytes) {
     if (pagePtr == NULL || pageSizeInBytes == 0U) return false;
 
     dzPageMetadata *pageMetadata = (dzPageMetadata *) (pagePtr
@@ -152,7 +162,7 @@ bool dzPageMarkAsCorrupted(dzByte *pagePtr, dzU32 pageSizeInBytes) {
     // NOTE: Free blocks can never be corrupted
     if (pageMetadata->state == DZ_PAGE_STATE_FREE) return false;
 
-    pageMetadata->state = DZ_PAGE_STATE_CORRUPTED;
+    pageMetadata->state = DZ_PAGE_STATE_BAD;
 
     return true;
 }
@@ -164,14 +174,14 @@ bool dzPageMarkAsFree(dzByte *pagePtr, dzU32 pageSizeInBytes) {
     dzPageMetadata *pageMetadata = (dzPageMetadata *) (pagePtr
                                                        + pageSizeInBytes);
 
-    if (pageMetadata->state == DZ_PAGE_STATE_CORRUPTED
+    if (pageMetadata->state == DZ_PAGE_STATE_BAD
         || pageMetadata->state == DZ_PAGE_STATE_FREE)
         return false;
 
     pageMetadata->peCycleCount--;
 
     pageMetadata->state = (pageMetadata->peCycleCount == 0)
-                              ? DZ_PAGE_STATE_CORRUPTED
+                              ? DZ_PAGE_STATE_BAD
                               : DZ_PAGE_STATE_FREE;
 
     return true;

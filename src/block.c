@@ -23,9 +23,11 @@
 
 /* A structure that represents the metadata of a NAND flash block. */
 struct dzBlockMetadata_ {
-    dzBlockConfig config;
+    dzU64 blockId;
     dzU64 totalEraseCount;
     // dzF64 lastEraseTime;
+    dzCellType cellType;
+    dzBlockState state;
     // TODO: ...
 };
 
@@ -34,6 +36,14 @@ struct dzBlockMetadata_ {
 // TODO: ...
 
 /* Constants ==============================================================> */
+
+/* Average 'erase' latencies for each cell type, in miliseconds. */
+static const dzF64 eraseLatencyTable[DZ_CELL_TYPE_COUNT_] = {
+    [DZ_CELL_TYPE_SLC] = 2.0,
+    [DZ_CELL_TYPE_MLC] = 3.0,
+    [DZ_CELL_TYPE_TLC] = 3.5,
+    [DZ_CELL_TYPE_QLC] = 4.0
+};
 
 /* A constant that represents an invalid block id. */
 const dzU64 DZ_BLOCK_INVALID_ID = UINT64_MAX;
@@ -48,17 +58,21 @@ const dzU64 DZ_BLOCK_INVALID_ID = UINT64_MAX;
 
 /* Public Functions =======================================================> */
 
-/* Initializes a block metadata within the given `blockMetadataPtr`. */
-bool dzBlockInitMetadata(dzByte *blockMetadataPtr, dzBlockConfig config) {
-    if (blockMetadataPtr == NULL) return false;
+/* Initializes a block metadata within the given `blockMetadata`. */
+bool dzBlockInitMetadata(dzBlockMetadata *blockMetadata,
+                         dzBlockConfig config) {
+    if (blockMetadata == NULL) return false;
 
-    dzBlockMetadata *blockMetadata = (dzBlockMetadata *) blockMetadataPtr;
+    {
+        blockMetadata->blockId = config.blockId;
 
-    blockMetadata->config = config;
+        blockMetadata->totalEraseCount = 0U;
+        // blockMetadata->lastEraseTime = 0.0;
 
-    blockMetadata->totalEraseCount = 0U;
-
-    // blockMetadata->lastEraseTime = 0.0;
+        blockMetadata->cellType = config.cellType;
+        
+        blockMetadata->state = DZ_BLOCK_STATE_FREE;
+    }
 
     return true;
 }
@@ -66,4 +80,42 @@ bool dzBlockInitMetadata(dzByte *blockMetadataPtr, dzBlockConfig config) {
 /* Returns the size of `dzBlockMetadata`. */
 dzUSize dzBlockGetMetadataSize(void) {
     return sizeof(dzBlockMetadata);
+}
+
+/* Returns the current state of a block. */
+dzBlockState dzBlockGetState(dzBlockMetadata *blockMetadata) {
+    return (blockMetadata != NULL) ? blockMetadata->state
+                                   : DZ_BLOCK_STATE_UNKNOWN;
+}
+
+/* Marks a block as bad. */
+bool dzBlockMarkAsBad(dzBlockMetadata *blockMetadata) {
+    if (blockMetadata == NULL) return false;
+
+    blockMetadata->state = DZ_BLOCK_STATE_BAD;
+
+    return true;
+}
+
+/* Marks a block as free. */
+bool dzBlockMarkAsFree(dzBlockMetadata *blockMetadata, dzF64 *eraseLatency) {
+    if (blockMetadata == NULL || eraseLatency == NULL) return false;
+
+    blockMetadata->state = DZ_BLOCK_STATE_FREE;
+
+    *eraseLatency =
+        dzUtilsGaussian(eraseLatencyTable[blockMetadata->cellType],
+                        DZ_BLOCK_ERASE_LATENCY_STDDEV_RATIO
+                            * eraseLatencyTable[blockMetadata->cellType]);
+
+    return true;
+}
+
+/* Marks a block as valid. */
+bool dzBlockMarkAsValid(dzBlockMetadata *blockMetadata) {
+    if (blockMetadata == NULL) return false;
+
+    blockMetadata->state = DZ_BLOCK_STATE_VALID;
+
+    return true;
 }

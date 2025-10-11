@@ -20,16 +20,23 @@ I present SSDeez, a lightweight NAND flash-based SSD simulator written in C99, f
     - [x] Program/Read Operations
   - Out-Of-Band (OOB) Area
     - [ ] Error Correction Code (ECC)
-    - [x] Page States (Free, Valid, Invalid, etc.)
-    - [x] Page-Level Statistics
-      - [ ] Last Program/Read Time
-      - [x] Total Program/Read Counts
+    - [x] Page States (Free, Valid, Bad, etc.)
+    - [ ] Page-Level Statistics
+      - [ ] Last Program Time
+      - [ ] Last Read Time
+      - [x] Total Program Count
+      - [ ] Total Read Count
     - [x] Program/Read Latencies
     - [x] Randomized P/E Cycle Counts
       - [x] Gaussian Sampling ([Marsaglia's Polar](https://www.jstor.org/stable/2027592) + [xoshiro256++](https://prng.di.unimi.it))
       - [x] Layer-to-Layer Endurance Variation
     - [ ] Read Disturbance
 - Block
+  - [x] Block States (Free, Valid, Bad, etc.)
+  - [ ] Block-Level Statistics
+      - [ ] Last Erase Time
+      - [x] Total Erase Count
+  - [x] Erase Latencies
 - Plane
 - Die (Chip)
 - Channel
