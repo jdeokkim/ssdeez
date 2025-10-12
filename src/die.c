@@ -1,18 +1,23 @@
 /*
-    Copyright (c) 2025 Jaedeok Kim (jdeokkim@protonmail.com)
+    Copyright (c) 2025 Jaedeok Kim <jdeokkim@protonmail.com>
 
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
+    Permission is hereby granted, free of charge, to any person obtaining a 
+    copy of this software and associated documentation files (the "Software"),
+    to deal in the Software without restriction, including without limitation 
+    the rights to use, copy, modify, merge, publish, distribute, sublicense, 
+    and/or sell copies of the Software, and to permit persons to whom the 
+    Software is furnished to do so, subject to the following conditions:
 
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+    The above copyright notice and this permission notice shall be included 
+    in all copies or substantial portions of the Software.
 
-    You should have received a copy of the GNU General Public License
-    along with this program. If not, see <https://www.gnu.org/licenses/>.
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING 
+    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER 
+    DEALINGS IN THE SOFTWARE.
 */
 
 /* Includes ===============================================================> */
@@ -199,10 +204,11 @@ dzPageState dzDieGetPageState(const dzDie *die, dzU64 pageId) {
 }
 
 /* Writes `srcBuffer` to the `pageId`-th page in `die`. */
-bool dzDieProgramPage(dzDie *die, dzU64 pageId, const void *srcBuffer) {
+bool dzDieProgramPage(dzDie *die, dzU64 pageId, dzSizedBuffer srcBuffer) {
     dzByte *pagePtr = dzDiePageIdToPtr(die, pageId);
 
-    if (pagePtr == NULL || srcBuffer == NULL) return false;
+    if (pagePtr == NULL || srcBuffer.ptr == NULL || srcBuffer.size == 0U)
+        return false;
 
     {
         dzF64 programLatency = -DBL_MAX;
@@ -226,16 +232,21 @@ bool dzDieProgramPage(dzDie *die, dzU64 pageId, const void *srcBuffer) {
         if (!dzBlockMarkAsValid(blockMetadata)) return false;
     }
 
-    (void) memcpy(pagePtr, srcBuffer, die->config.pageSizeInBytes);
+    (void) memcpy(pagePtr,
+                  srcBuffer.ptr,
+                  ((srcBuffer.size < die->config.pageSizeInBytes)
+                       ? srcBuffer.size
+                       : die->config.pageSizeInBytes));
 
     return true;
 }
 
 /* Reads data from the `pageId`-th page in `die`, copying it to `dstBuffer`. */
-bool dzDieReadPage(dzDie *die, dzU64 pageId, void *dstBuffer) {
+bool dzDieReadPage(dzDie *die, dzU64 pageId, dzSizedBuffer dstBuffer) {
     dzByte *pagePtr = dzDiePageIdToPtr(die, pageId);
 
-    if (pagePtr == NULL || dstBuffer == NULL) return false;
+    if (pagePtr == NULL || dstBuffer.ptr == NULL || dstBuffer.size == 0U)
+        return false;
 
     {
         dzF64 readLatency = -DBL_MAX;
@@ -250,7 +261,11 @@ bool dzDieReadPage(dzDie *die, dzU64 pageId, void *dstBuffer) {
         die->stats.totalReadCount++;
     }
 
-    (void) memcpy(dstBuffer, pagePtr, die->config.pageSizeInBytes);
+    (void) memcpy(dstBuffer.ptr,
+                  pagePtr,
+                  ((dstBuffer.size < die->config.pageSizeInBytes)
+                       ? dstBuffer.size
+                       : die->config.pageSizeInBytes));
 
     return true;
 }

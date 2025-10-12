@@ -1,18 +1,23 @@
 /*
-    Copyright (c) 2025 Jaedeok Kim (jdeokkim@protonmail.com)
+    Copyright (c) 2025 Jaedeok Kim <jdeokkim@protonmail.com>
 
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
+    Permission is hereby granted, free of charge, to any person obtaining a 
+    copy of this software and associated documentation files (the "Software"),
+    to deal in the Software without restriction, including without limitation 
+    the rights to use, copy, modify, merge, publish, distribute, sublicense, 
+    and/or sell copies of the Software, and to permit persons to whom the 
+    Software is furnished to do so, subject to the following conditions:
 
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+    The above copyright notice and this permission notice shall be included 
+    in all copies or substantial portions of the Software.
 
-    You should have received a copy of the GNU General Public License
-    along with this program. If not, see <https://www.gnu.org/licenses/>.
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING 
+    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER 
+    DEALINGS IN THE SOFTWARE.
 */
 
 /* Includes ===============================================================> */
@@ -28,10 +33,10 @@
 
 static const dzDieConfig dieConfig = { .dieId = 0U,
                                        .cellType = DZ_CELL_TYPE_MLC,
-                                       .planeCountPerDie = 2U,
-                                       .blockCountPerPlane = 4U,
-                                       .pageCountPerBlock = 5U,
-                                       .pageSizeInBytes = 16U };
+                                       .planeCountPerDie = 4U,
+                                       .blockCountPerPlane = 64U,
+                                       .pageCountPerBlock = 128U,
+                                       .pageSizeInBytes = 8192U };
 
 /* Private Variables ======================================================> */
 
@@ -76,14 +81,17 @@ TEST dzTestPageOps(void) {
 
     // clang-format off
 
-    const dzByte srcBuffer[] = { 
+    const dzByte srcData[] = { 
         0x12, 0x34, 0x56, 0x78, 0x91, 0x23, 0x45, 0x67,
         0x89, 0x01, 0x23, 0x45, 0x67, 0x89, 0x01, 0x23
     };
 
-    ASSERT_LTE(sizeof srcBuffer, dieConfig.pageSizeInBytes);
-
     // clang-format on
+
+    dzSizedBuffer srcBuffer = { .ptr = (dzByte *) srcData,
+                                .size = sizeof srcData };
+
+    ASSERT_LTE(srcBuffer.size, dieConfig.pageSizeInBytes);
 
     for (dzU64 i = 0, j = dzDieGetPageCount(die); i < j; i++) {
         ASSERT_EQ(true, dzDieProgramPage(die, i, srcBuffer));
@@ -92,15 +100,18 @@ TEST dzTestPageOps(void) {
         ASSERT_EQ(false, dzDieProgramPage(die, i, srcBuffer));
     }
 
-    dzByte dstBuffer[sizeof srcBuffer];
+    dzByte dstData[sizeof srcData];
+
+    dzSizedBuffer dstBuffer = { .ptr = (dzByte *) dstData,
+                                .size = sizeof dstData };
 
     for (dzU64 i = 0, j = dzDieGetPageCount(die); i < j; i++) {
         // NOTE: Making sure `dzDieReadPage()` is doing its job well
-        memset(dstBuffer, 0xFF, sizeof dstBuffer);
+        memset(dstBuffer.ptr, 0xFF, dstBuffer.size);
 
         ASSERT_EQ(true, dzDieReadPage(die, i, dstBuffer));
 
-        ASSERT_MEM_EQ(srcBuffer, dstBuffer, sizeof srcBuffer);
+        ASSERT_MEM_EQ(srcBuffer.ptr, dstBuffer.ptr, srcBuffer.size);
     }
 
     PASS();
@@ -111,14 +122,17 @@ TEST dzTestBlockOps(void) {
 
     // clang-format off
 
-    const dzByte srcBuffer[] = { 
+    const dzByte srcData[] = { 
         0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
         0x88, 0x99, 0x00, 0x11, 0x22, 0x33, 0x44, 0x55,
     };
 
-    ASSERT_LTE(sizeof srcBuffer, dieConfig.pageSizeInBytes);
-
     // clang-format on
+
+    dzSizedBuffer srcBuffer = { .ptr = (dzByte *) srcData,
+                                .size = sizeof srcData };
+
+    ASSERT_LTE(srcBuffer.size, dieConfig.pageSizeInBytes);
 
     {
         for (dzU64 i = 0, j = dzDieGetPageCount(die); i < j; i++)
@@ -137,14 +151,17 @@ TEST dzTestBlockOps(void) {
     }
 
     {
-        dzByte dstBuffer[sizeof srcBuffer];
+        dzByte dstData[sizeof srcData];
+
+        dzSizedBuffer dstBuffer = { .ptr = (dzByte *) dstData,
+                                    .size = sizeof dstData };
 
         for (dzU64 i = 0, j = dzDieGetPageCount(die); i < j; i++) {
             ASSERT_EQ(true, dzDieReadPage(die, i, dstBuffer));
 
             // NOTE: Check if all pages have been initialized to `0xFF`
             for (dzU64 k = 0; k < sizeof dstBuffer; k++)
-                ASSERT_EQ((dzByte) 0xFF, dstBuffer[k]);
+                ASSERT_EQ((dzByte) 0xFF, dstBuffer.ptr[k]);
         }
     }
 

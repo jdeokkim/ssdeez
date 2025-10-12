@@ -22,27 +22,29 @@
 
 /* Includes ===============================================================> */
 
-#include "greatest.h"
 #include "ssdeez.h"
 
-/* Public Function Prototypes =============================================> */
+/* Macros =================================================================> */
 
-SUITE_EXTERN(dzTestDieOps);
-SUITE_EXTERN(dzTestUtils);
+// TODO: ...
+
+/* Typedefs ===============================================================> */
+
+// TODO: ...
+
+/* Constants ==============================================================> */
+
+/* A constant that represents an invalid chip identifier. */
+const dzU64 DZ_CHIP_INVALID_ID = UINT64_MAX;
+
+/* Private Variables ======================================================> */
+
+// TODO: ...
+
+/* Private Function Prototypes ============================================> */
+
+// TODO: ...
 
 /* Public Functions =======================================================> */
 
-GREATEST_MAIN_DEFS();
-
-/* ========================================================================> */
-
-int main(int argc, char *argv[]) {
-    GREATEST_MAIN_BEGIN();
-
-    RUN_SUITE(dzTestDieOps);
-    RUN_SUITE(dzTestUtils);
-
-    GREATEST_MAIN_END();
-
-    return 0;
-}
+// TODO: ...
