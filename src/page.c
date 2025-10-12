@@ -27,9 +27,10 @@
 
 /* A structure that represents the metadata of a NAND flash page. */
 struct dzPageMetadata_ {
+    dzPPA physicalPageAddress;
     dzU64 totalProgramCount;
     dzU64 totalReadCount;
-    /// dzF64 lastProgramTime;
+    // dzF64 lastProgramTime;
     // dzF64 lastReadTime;
     dzU32 peCycleCount;
     dzCellType cellType;
@@ -89,6 +90,8 @@ bool dzPageInitMetadata(dzByte *pagePtr, dzPageConfig config) {
         (dzPageMetadata *) (pagePtr + config.pageSizeInBytes);
 
     {
+        pageMetadata->physicalPageAddress = config.physicalPageAddress;
+
         pageMetadata->totalProgramCount = 0U;
         pageMetadata->totalReadCount = 0U;
 
@@ -123,6 +126,20 @@ bool dzPageInitMetadata(dzByte *pagePtr, dzPageConfig config) {
 /* Returns the size of `dzPageMetadata`. */
 dzUSize dzPageGetMetadataSize(void) {
     return sizeof(dzPageMetadata);
+}
+
+/* Returns the physical page address of a page. */
+dzPPA dzPageGetPPA(const dzByte *pagePtr, dzU32 pageSizeInBytes) {
+    if (pagePtr == NULL)
+        return (dzPPA) { .dieId = DZ_DIE_INVALID_ID,
+                         .planeId = DZ_PLANE_INVALID_ID,
+                         .blockId = DZ_BLOCK_INVALID_ID,
+                         .pageId = DZ_PAGE_INVALID_ID };
+
+    dzPageMetadata *pageMetadata = (dzPageMetadata *) (pagePtr
+                                                       + pageSizeInBytes);
+
+    return pageMetadata->physicalPageAddress;
 }
 
 /* Returns the current state of a page. */

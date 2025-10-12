@@ -45,7 +45,7 @@ static const dzF64 eraseLatencyTable[DZ_CELL_TYPE_COUNT_] = {
     [DZ_CELL_TYPE_QLC] = 4.0
 };
 
-/* A constant that represents an invalid block id. */
+/* A constant that represents an invalid block identifier. */
 const dzU64 DZ_BLOCK_INVALID_ID = UINT64_MAX;
 
 /* Private Variables ======================================================> */
@@ -70,7 +70,7 @@ bool dzBlockInitMetadata(dzBlockMetadata *blockMetadata,
         // blockMetadata->lastEraseTime = 0.0;
 
         blockMetadata->cellType = config.cellType;
-        
+
         blockMetadata->state = DZ_BLOCK_STATE_FREE;
     }
 

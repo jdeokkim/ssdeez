@@ -45,6 +45,7 @@ OBJECTS = \
 	${SOURCE_PATH}/block.o    \
 	${SOURCE_PATH}/die.o      \
 	${SOURCE_PATH}/page.o     \
+	${SOURCE_PATH}/plane.o    \
 	${SOURCE_PATH}/utils.o
 
 TARGET_BIN = ${BINARY_PATH}/${PROJECT_NAME}

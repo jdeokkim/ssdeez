@@ -134,6 +134,18 @@ typedef enum dzCellType_ {
 
 /* ========================================================================> */
 
+/* A structure that represents a physical page address. */
+typedef struct dzPPA_ {
+    // dzU64 channelId;
+    // dzU64 chipId;
+    dzU64 dieId;
+    dzU64 planeId;
+    dzU64 blockId;
+    dzU64 pageId;
+} dzPPA;
+
+/* ========================================================================> */
+
 /* A structure that represents a group of NAND flash planes. */
 typedef struct dzDie_ dzDie;
 
@@ -169,6 +181,7 @@ typedef struct dzBlockMetadata_ dzBlockMetadata;
 
 /* A structure that represents the configuration of a NAND flash page. */
 typedef struct dzPageConfig_ {
+    dzPPA physicalPageAddress;
     dzF64 peCycleCountPenalty;
     dzU32 pageSizeInBytes;
     dzCellType cellType;
@@ -178,6 +191,12 @@ typedef struct dzPageConfig_ {
 typedef struct dzPageMetadata_ dzPageMetadata;
 
 /* Constants ==============================================================> */
+
+/* A constant that represents an invalid die identifier. */
+extern const dzU64 DZ_DIE_INVALID_ID;
+
+/* A constant that represents an invalid plane identifier. */
+extern const dzU64 DZ_PLANE_INVALID_ID;
 
 /* A constant that represents an invalid block identifier. */
 extern const dzU64 DZ_BLOCK_INVALID_ID;
@@ -218,8 +237,14 @@ void dzDieRelease(dzDie *die);
 /* Returns the total number of blocks in `die`. */
 dzU64 dzDieGetBlockCount(const dzDie *die);
 
+/* Returns the current state of the `blockId`-th block in `die`. */
+dzBlockState dzDieGetBlockState(const dzDie *die, dzU64 blockId);
+
 /* Returns the total number of pages in `die`. */
 dzU64 dzDieGetPageCount(const dzDie *die);
+
+/* Returns the current state of the `pageId`-th page in `die`. */
+dzPageState dzDieGetPageState(const dzDie *die, dzU64 pageId);
 
 /* Writes `srcBuffer` to the `pageId`-th page in `die`. */
 bool dzDieProgramPage(dzDie *die, dzU64 pageId, const void *srcBuffer);
@@ -230,12 +255,6 @@ bool dzDieReadPage(dzDie *die, dzU64 pageId, void *dstBuffer);
 /* Erases the `blockId`-th block in `die`. */
 bool dzDieEraseBlock(dzDie *die, dzU64 blockId);
 
-/* Returns the memory address of the `pageId`-th page in `die`. */
-dzByte *dzDiePageIdToPtr(const dzDie *die, dzU64 pageId);
-
-/* Returns the `die`-local page identifier corresponding to `pagePtr`. */
-dzU64 dzDiePagePtrToId(const dzDie *die, const dzByte *pagePtr);
-
 /* <------------------------------------------------------------ [src/page.c] */
 
 /* Initializes a page metadata within the given `pagePtr`. */
@@ -243,6 +262,9 @@ bool dzPageInitMetadata(dzByte *pagePtr, dzPageConfig config);
 
 /* Returns the size of `dzPageMetadata`. */
 dzUSize dzPageGetMetadataSize(void);
+
+/* Returns the physical page address of a page. */
+dzPPA dzPageGetPPA(const dzByte *pagePtr, dzU32 pageSizeInBytes);
 
 /* Returns the current state of a page. */
 dzPageState dzPageGetState(const dzByte *pagePtr, dzU32 pageSizeInBytes);

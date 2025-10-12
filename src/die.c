@@ -51,6 +51,7 @@
 struct dzDieMetadata_ {
     dzU64 blockCountPerDie;
     dzU64 pageCountPerDie;
+    dzU64 pageCountPerPlane;
     dzU64 physicalBlockSize;
     dzU64 physicalPageSize;
     // TODO: ...
@@ -77,6 +78,11 @@ struct dzDie_ {
     // TODO: ...
 };
 
+/* Constants ==============================================================> */
+
+/* A constant that represents an invalid die identifier. */
+const dzU64 DZ_DIE_INVALID_ID = UINT64_MAX;
+
 /* Private Variables ======================================================> */
 
 // TODO: ...
@@ -86,12 +92,14 @@ struct dzDie_ {
 /* Creates a die buffer with the given `config` and `metadata`. */
 static dzByte *dzDieCreateBuffer(dzDieConfig config, dzDieMetadata metadata);
 
-/* Returns the memory address of the `pageId`-th page in `die`. */
-static DZ_API_INLINE dzByte *dzDiePageIdToPtr_(const dzDie *die, dzU64 pageId);
+/* ========================================================================> */
 
-/* Returns the `die`-local page identifier corresponding to `pagePtr`. */
-static DZ_API_INLINE dzU64 dzDiePagePtrToId_(const dzDie *die,
-                                             const dzByte *pagePtr);
+/* Returns the metadata of the `blockId`-th block in `die`. */
+static DZ_API_INLINE dzBlockMetadata *dzDieBlockIdToMetadata(const dzDie *die,
+                                                             dzU64 blockId);
+
+/* Returns the memory address of the `pageId`-th page in `die`. */
+static DZ_API_INLINE dzByte *dzDiePageIdToPtr(const dzDie *die, dzU64 pageId);
 
 /* Public Functions =======================================================> */
 
@@ -115,6 +123,9 @@ dzDie *dzDieCreate(dzDieConfig config) {
         die->metadata.pageCountPerDie = die->metadata.blockCountPerDie
                                         * config.pageCountPerBlock;
 
+        die->metadata.pageCountPerPlane = die->metadata.pageCountPerDie
+                                          / config.planeCountPerDie;
+
         die->metadata.physicalPageSize = config.pageSizeInBytes
                                          + dzPageGetMetadataSize();
 
@@ -129,9 +140,7 @@ dzDie *dzDieCreate(dzDieConfig config) {
                                     * blockMetadataSize);
 
         for (dzU64 i = 0U; i < die->metadata.blockCountPerDie; i++) {
-            dzBlockMetadata *blockMetadata =
-                (dzBlockMetadata *) (((dzByte *) die->blockMetadata)
-                                     + (i * blockMetadataSize));
+            dzBlockMetadata *blockMetadata = dzDieBlockIdToMetadata(die, i);
 
             dzBlockConfig blockConfig = { .blockId = i,
                                           .cellType = die->config.cellType };
@@ -165,14 +174,33 @@ dzU64 dzDieGetBlockCount(const dzDie *die) {
     return (die != NULL) ? die->metadata.blockCountPerDie : 0U;
 }
 
+/* Returns the current state of the `blockId`-th block in `die`. */
+dzBlockState dzDieGetBlockState(const dzDie *die, dzU64 blockId) {
+    if (die == NULL || blockId >= die->metadata.blockCountPerDie)
+        return DZ_BLOCK_STATE_UNKNOWN;
+
+    dzBlockMetadata *blockMetadata = dzDieBlockIdToMetadata(die, blockId);
+
+    return dzBlockGetState(blockMetadata);
+}
+
 /* Returns the total number of pages in `die`. */
 dzU64 dzDieGetPageCount(const dzDie *die) {
     return (die != NULL) ? die->metadata.pageCountPerDie : 0U;
 }
 
+/* Returns the current state of the `pageId`-th page in `die`. */
+dzPageState dzDieGetPageState(const dzDie *die, dzU64 pageId) {
+    dzByte *pagePtr = dzDiePageIdToPtr(die, pageId);
+
+    if (pagePtr == NULL) return false;
+
+    return dzPageGetState(pagePtr, die->config.pageSizeInBytes);
+}
+
 /* Writes `srcBuffer` to the `pageId`-th page in `die`. */
 bool dzDieProgramPage(dzDie *die, dzU64 pageId, const void *srcBuffer) {
-    dzByte *pagePtr = dzDiePageIdToPtr_(die, pageId);
+    dzByte *pagePtr = dzDiePageIdToPtr(die, pageId);
 
     if (pagePtr == NULL || srcBuffer == NULL) return false;
 
@@ -190,16 +218,22 @@ bool dzDieProgramPage(dzDie *die, dzU64 pageId, const void *srcBuffer) {
         die->stats.totalProgramCount++;
     }
 
-    (void) memcpy(pagePtr, srcBuffer, die->config.pageSizeInBytes);
+    {
+        dzU64 blockId = pageId / die->config.pageCountPerBlock;
 
-    // TODO: dzBlockMarkAsValid() 
+        dzBlockMetadata *blockMetadata = dzDieBlockIdToMetadata(die, blockId);
+
+        if (!dzBlockMarkAsValid(blockMetadata)) return false;
+    }
+
+    (void) memcpy(pagePtr, srcBuffer, die->config.pageSizeInBytes);
 
     return true;
 }
 
 /* Reads data from the `pageId`-th page in `die`, copying it to `dstBuffer`. */
 bool dzDieReadPage(dzDie *die, dzU64 pageId, void *dstBuffer) {
-    dzByte *pagePtr = dzDiePageIdToPtr_(die, pageId);
+    dzByte *pagePtr = dzDiePageIdToPtr(die, pageId);
 
     if (pagePtr == NULL || dstBuffer == NULL) return false;
 
@@ -237,9 +271,7 @@ bool dzDieEraseBlock(dzDie *die, dzU64 blockId) {
         }
     }
 
-    dzBlockMetadata *blockMetadata =
-        (dzBlockMetadata *) (((dzByte *) die->blockMetadata)
-                             + (blockId * dzBlockGetMetadataSize()));
+    dzBlockMetadata *blockMetadata = dzDieBlockIdToMetadata(die, blockId);
 
     if (!result) {
         /* NOTE: Mark all pages in the block as bad */
@@ -267,16 +299,6 @@ bool dzDieEraseBlock(dzDie *die, dzU64 blockId) {
     return result;
 }
 
-/* Returns the memory address of the `pageId`-th page in `die`. */
-dzByte *dzDiePageIdToPtr(const dzDie *die, dzU64 pageId) {
-    return dzDiePageIdToPtr_(die, pageId);
-}
-
-/* Returns the `die`-local page identifier corresponding to `pagePtr`. */
-dzU64 dzDiePagePtrToId(const dzDie *die, const dzByte *pagePtr) {
-    return dzDiePagePtrToId_(die, pagePtr);
-}
-
 /* Private Functions ======================================================> */
 
 /* Creates a die buffer with the given `config` and `metadata`. */
@@ -290,29 +312,37 @@ static dzByte *dzDieCreateBuffer(dzDieConfig config, dzDieMetadata metadata) {
     // NOTE: Simulating the 'erased' state by setting all bits to `1`
     (void) memset(result, 0xFF, config.pageSizeInBytes);
 
-    dzU64 pageIndex = 0U, centerPageIndex = metadata.pageCountPerDie >> 1;
+    dzU64 pageId = 0U, centerPageId = metadata.pageCountPerDie >> 1;
 
     dzDieForEachPage(result, metadata, pagePtr) {
         dzF64 peCycleCountPenalty = 1.0;
 
         // NOTE: Pages in the top and bottom layers should have lower endurance
         if (metadata.pageCountPerDie > 2) {
-            dzU64 distanceFromCenter = (pageIndex > centerPageIndex)
-                                           ? (pageIndex - centerPageIndex)
-                                           : (centerPageIndex - pageIndex);
+            dzU64 distanceFromCenter = (pageId > centerPageId)
+                                           ? (pageId - centerPageId)
+                                           : (centerPageId - pageId);
 
             dzF64 penaltyScale = ((dzF64) distanceFromCenter
-                                  / (dzF64) centerPageIndex);
+                                  / (dzF64) centerPageId);
 
             peCycleCountPenalty -= (penaltyScale
                                     * DZ_PAGE_PE_CYCLE_COUNT_MAX_PENALTY);
         }
 
-        dzPageConfig pageConfig = {
-            .cellType = config.cellType,
-            .pageSizeInBytes = config.pageSizeInBytes,
-            .peCycleCountPenalty = peCycleCountPenalty
+        dzPPA physicalPageAddress = {
+            .dieId = config.dieId,
+            .planeId = pageId / metadata.pageCountPerPlane,
+            .blockId = (pageId % metadata.pageCountPerPlane)
+                       / config.pageCountPerBlock,
+            .pageId = pageId % config.pageCountPerBlock
+            // TODO: ...
         };
+
+        dzPageConfig pageConfig = { .physicalPageAddress = physicalPageAddress,
+                                    .peCycleCountPenalty = peCycleCountPenalty,
+                                    .pageSizeInBytes = config.pageSizeInBytes,
+                                    .cellType = config.cellType };
 
         if (!dzPageInitMetadata(pagePtr, pageConfig)) {
             free(result);
@@ -320,32 +350,25 @@ static dzByte *dzDieCreateBuffer(dzDieConfig config, dzDieMetadata metadata) {
             return NULL;
         }
 
-        pageIndex++;
+        pageId++;
     }
 
     return result;
 }
 
-/* Returns the `die`-local page identifier corresponding to `pagePtr`. */
-static DZ_API_INLINE dzU64 dzDiePagePtrToId_(const dzDie *die,
-                                             const dzByte *pagePtr) {
-    if (die == NULL || pagePtr == NULL) return false;
+/* ========================================================================> */
 
-    const dzByte *nextPagePtr = die->buffer
-                                + (die->metadata.pageCountPerDie
-                                   * die->metadata.physicalPageSize);
-
-    if (pagePtr < die->buffer || pagePtr >= nextPagePtr)
-        return DZ_PAGE_INVALID_ID;
-
-    dzU64 ptrOffset = (dzU64) (pagePtr - die->buffer);
-
-    return ptrOffset / die->metadata.physicalPageSize;
+/* Returns the metadata of the `blockId`-th block in `die`. */
+static DZ_API_INLINE dzBlockMetadata *dzDieBlockIdToMetadata(const dzDie *die,
+                                                             dzU64 blockId) {
+    return (blockId < die->metadata.blockCountPerDie)
+               ? (dzBlockMetadata *) (((dzByte *) die->blockMetadata)
+                                      + (blockId * dzBlockGetMetadataSize()))
+               : NULL;
 }
 
 /* Returns the memory address of the `pageId`-th page in `die`. */
-static DZ_API_INLINE dzByte *dzDiePageIdToPtr_(const dzDie *die,
-                                               dzU64 pageId) {
+static DZ_API_INLINE dzByte *dzDiePageIdToPtr(const dzDie *die, dzU64 pageId) {
     if (die == NULL || die->buffer == NULL
         || pageId >= die->metadata.pageCountPerDie)
         return NULL;
