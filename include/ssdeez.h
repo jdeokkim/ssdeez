@@ -52,6 +52,9 @@ extern "C" {
     #endif
 #endif  // `DZ_API_INLINE`
 
+/* Ignores the "unused parameter" and "unused variable" errors. */
+#define DZ_API_UNUSED_VARIABLE(x) ((void) (x))
+
 /* Macro-defined Constants ================================================> */
 
 // clang-format off
@@ -169,6 +172,17 @@ typedef struct dzDieMetadata_ dzDieMetadata;
 
 /* A structure that represents various statistics of a NAND flash die. */
 typedef struct dzDieStatistics_ dzDieStatistics;
+
+/* ========================================================================> */
+
+/* A structure that represents the configuration of a NAND flash plane. */
+typedef struct dzPlaneConfig_ {
+    dzU64 planeId;
+    // TODO: ...
+} dzPlaneConfig;
+
+/* A structure that represents the metadata of a NAND flash plane. */
+typedef struct dzPlaneMetadata_ dzPlaneMetadata;
 
 /* ========================================================================> */
 
@@ -297,6 +311,14 @@ bool dzPageMarkAsFree(dzByte *pagePtr, dzU32 pageSizeInBytes);
 bool dzPageMarkAsValid(dzByte *pagePtr,
                        dzU32 pageSizeInBytes,
                        dzF64 *programLatency);
+
+/* <---------------------------------------------------------- [src/plane.c] */
+
+/* Initializes a plane metadata within the given `planeMetadata`. */
+bool dzPlaneInitMetadata(dzPlaneMetadata *planeMetadata, dzPlaneConfig config);
+
+/* Returns the size of `dzPlaneMetadata`. */
+dzUSize dzPlaneGetMetadataSize(void);
 
 /* <---------------------------------------------------------- [src/utils.c] */
 

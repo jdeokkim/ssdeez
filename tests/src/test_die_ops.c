@@ -27,7 +27,7 @@
 
 /* Macros =================================================================> */
 
-#define UNUSED(x) ((void) (x))
+// TODO: ...
 
 /* Constants ==============================================================> */
 
@@ -63,13 +63,13 @@ SUITE(dzTestDieOps) {
 /* Private Functions ======================================================> */
 
 static void dzTestSetupCb(void *ctx) {
-    UNUSED(ctx);
+    DZ_API_UNUSED_VARIABLE(ctx);
 
     die = dzDieCreate(dieConfig);
 }
 
 static void dzTestTeardownCb(void *ctx) {
-    UNUSED(ctx);
+    DZ_API_UNUSED_VARIABLE(ctx);
 
     dzDieRelease(die), die = NULL;
 }

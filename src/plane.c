@@ -30,7 +30,11 @@
 
 /* Typedefs ===============================================================> */
 
-// TODO: ...
+/* A structure that represents the metadata of a NAND flash plane. */
+struct dzPlaneMetadata_ {
+    dzU64 planeId;
+    // TODO: ...
+};
 
 /* Constants ==============================================================> */
 
@@ -47,4 +51,21 @@ const dzU64 DZ_PLANE_INVALID_ID = UINT64_MAX;
 
 /* Public Functions =======================================================> */
 
-// TODO: ...
+/* Initializes a plane metadata within the given `planeMetadata`. */
+bool dzPlaneInitMetadata(dzPlaneMetadata *planeMetadata,
+                         dzPlaneConfig config) {
+    if (planeMetadata == NULL) return false;
+
+    {
+        planeMetadata->planeId = config.planeId;
+
+        // TODO: ...
+    }
+
+    return true;
+}
+
+/* Returns the size of `dzPlaneMetadata`. */
+dzUSize dzPlaneGetMetadataSize(void) {
+    return sizeof(dzPlaneMetadata);
+}

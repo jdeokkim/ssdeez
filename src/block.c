@@ -26,6 +26,10 @@
 
 /* Macros =================================================================> */
 
+// TODO: ...
+
+/* Typedefs ===============================================================> */
+
 /* A structure that represents the metadata of a NAND flash block. */
 struct dzBlockMetadata_ {
     dzU64 blockId;
@@ -35,10 +39,6 @@ struct dzBlockMetadata_ {
     dzBlockState state;
     // TODO: ...
 };
-
-/* Typedefs ===============================================================> */
-
-// TODO: ...
 
 /* Constants ==============================================================> */
 
