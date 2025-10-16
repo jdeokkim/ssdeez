@@ -33,6 +33,8 @@
 /* A structure that represents the metadata of a NAND flash block. */
 struct dzBlockMetadata_ {
     dzU64 blockId;
+    dzU64 nextPageId;
+    dzU64 lastPageId;
     dzU64 totalEraseCount;
     // dzF64 lastEraseTime;
     dzCellType cellType;
@@ -71,6 +73,9 @@ bool dzBlockInitMetadata(dzBlockMetadata *blockMetadata,
     {
         blockMetadata->blockId = config.blockId;
 
+        blockMetadata->nextPageId = 0U;
+        blockMetadata->lastPageId = config.lastPageId;
+
         blockMetadata->totalEraseCount = 0U;
         // blockMetadata->lastEraseTime = 0.0;
 
@@ -95,7 +100,8 @@ dzBlockState dzBlockGetState(dzBlockMetadata *blockMetadata) {
 
 /* Marks a block as bad. */
 bool dzBlockMarkAsBad(dzBlockMetadata *blockMetadata) {
-    if (blockMetadata == NULL) return false;
+    if (blockMetadata == NULL || blockMetadata->state == DZ_BLOCK_STATE_FREE)
+        return false;
 
     blockMetadata->state = DZ_BLOCK_STATE_BAD;
 
@@ -104,7 +110,10 @@ bool dzBlockMarkAsBad(dzBlockMetadata *blockMetadata) {
 
 /* Marks a block as free. */
 bool dzBlockMarkAsFree(dzBlockMetadata *blockMetadata, dzF64 *eraseLatency) {
-    if (blockMetadata == NULL || eraseLatency == NULL) return false;
+    if (blockMetadata == NULL || eraseLatency == NULL
+        || blockMetadata->state == DZ_BLOCK_STATE_BAD
+        || blockMetadata->state == DZ_BLOCK_STATE_FREE)
+        return false;
 
     blockMetadata->state = DZ_BLOCK_STATE_FREE;
 
@@ -118,7 +127,8 @@ bool dzBlockMarkAsFree(dzBlockMetadata *blockMetadata, dzF64 *eraseLatency) {
 
 /* Marks a block as valid. */
 bool dzBlockMarkAsValid(dzBlockMetadata *blockMetadata) {
-    if (blockMetadata == NULL) return false;
+    if (blockMetadata == NULL || blockMetadata->state != DZ_BLOCK_STATE_FREE)
+        return false;
 
     blockMetadata->state = DZ_BLOCK_STATE_VALID;
 

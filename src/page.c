@@ -55,10 +55,10 @@ static const dzU32 peCycleCountTable[DZ_CELL_TYPE_COUNT_] = {
 
 /* Average 'program' latencies for each cell type, in miliseconds. */
 static const dzF64 programLatencyTable[DZ_CELL_TYPE_COUNT_] = {
-    [DZ_CELL_TYPE_SLC] = 1.0,
-    [DZ_CELL_TYPE_MLC] = 2.5,
+    [DZ_CELL_TYPE_SLC] = 0.85,
+    [DZ_CELL_TYPE_MLC] = 2.25,
     [DZ_CELL_TYPE_TLC] = 3.75,
-    [DZ_CELL_TYPE_QLC] = 5.5
+    [DZ_CELL_TYPE_QLC] = 5.25
 };
 
 /* Average 'read' latencies for each cell type, in miliseconds. */
@@ -66,7 +66,7 @@ static const dzF64 readLatencyTable[DZ_CELL_TYPE_COUNT_] = {
     [DZ_CELL_TYPE_SLC] = 0.015,
     [DZ_CELL_TYPE_MLC] = 0.035,
     [DZ_CELL_TYPE_TLC] = 0.060,
-    [DZ_CELL_TYPE_QLC] = 0.095
+    [DZ_CELL_TYPE_QLC] = 0.085
 };
 
 /* ========================================================================> */

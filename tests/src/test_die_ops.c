@@ -31,12 +31,13 @@
 
 /* Constants ==============================================================> */
 
+// NOTE: Based on the specs provided in the Samsung K9F2G08U0M datasheet
 static const dzDieConfig dieConfig = { .dieId = 0U,
-                                       .cellType = DZ_CELL_TYPE_MLC,
-                                       .planeCountPerDie = 4U,
-                                       .blockCountPerPlane = 64U,
-                                       .pageCountPerBlock = 128U,
-                                       .pageSizeInBytes = 8192U };
+                                       .cellType = DZ_CELL_TYPE_SLC,
+                                       .planeCountPerDie = 1U,
+                                       .blockCountPerPlane = 2048U,
+                                       .pageCountPerBlock = 64U,
+                                       .pageSizeInBytes = 2048U };
 
 /* Private Variables ======================================================> */
 

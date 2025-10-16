@@ -60,7 +60,7 @@ extern "C" {
 // clang-format off
 
 /* Specifies the standard deviation ratio for the erase latency. */
-#define DZ_BLOCK_ERASE_LATENCY_STDDEV_RATIO    0.1
+#define DZ_BLOCK_ERASE_LATENCY_STDDEV_RATIO    0.05
 
 /*
     Specifies how much space the OOB (Out-Of-Band) area takes up,
@@ -84,7 +84,7 @@ extern "C" {
 #define DZ_PAGE_PROGRAM_LATENCY_STDDEV_RATIO   0.1
 
 /* Specifies the standard deviation ratio for the read latency. */
-#define DZ_PAGE_READ_LATENCY_STDDEV_RATIO      0.1
+#define DZ_PAGE_READ_LATENCY_STDDEV_RATIO      0.025
 
 /* Typedefs ===============================================================> */
 
@@ -189,6 +189,7 @@ typedef struct dzPlaneMetadata_ dzPlaneMetadata;
 /* A structure that represents the configuration of a NAND flash block. */
 typedef struct dzBlockConfig_ {
     dzU64 blockId;
+    dzU64 lastPageId;
     dzCellType cellType;
     // TODO: ...
 } dzBlockConfig;

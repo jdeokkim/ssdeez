@@ -203,6 +203,14 @@ bool dzDieProgramPage(dzDie *die, dzU64 pageId, dzSizedBuffer srcBuffer) {
         return false;
 
     {
+        dzU64 blockId = dzDiePageIdToBlockId(die, pageId);
+
+        dzBlockMetadata *blockMetadata = dzDieBlockIdToMetadata(die, blockId);
+
+        if (!dzBlockMarkAsValid(blockMetadata)) return false;
+    }
+
+    {
         dzF64 programLatency = -DBL_MAX;
 
         // NOTE: Erase-before-Write Property!
@@ -214,14 +222,6 @@ bool dzDieProgramPage(dzDie *die, dzU64 pageId, dzSizedBuffer srcBuffer) {
 
         die->stats.totalProgramLatency += programLatency;
         die->stats.totalProgramCount++;
-    }
-
-    {
-        dzU64 blockId = dzDiePageIdToBlockId(die, pageId);
-
-        dzBlockMetadata *blockMetadata = dzDieBlockIdToMetadata(die, blockId);
-
-        if (!dzBlockMarkAsValid(blockMetadata)) return false;
     }
 
     (void) memcpy(pagePtr,
@@ -418,8 +418,11 @@ static bool dzDieInitMetadata(dzDie *die) {
         for (dzU64 i = 0U; i < die->metadata.blockCountPerDie; i++) {
             dzBlockMetadata *blockMetadata = dzDieBlockIdToMetadata(die, i);
 
-            dzBlockConfig blockConfig = { .blockId = i,
-                                          .cellType = die->config.cellType };
+            dzBlockConfig blockConfig = {
+                .blockId = i,
+                .lastPageId = ((i + 1) * (die->config.pageCountPerBlock)) - 1,
+                .cellType = die->config.cellType
+            };
 
             if (!dzBlockInitMetadata(blockMetadata, blockConfig)) {
                 dzDieRelease(die);
