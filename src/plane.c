@@ -51,13 +51,12 @@ const dzU64 DZ_PLANE_INVALID_ID = UINT64_MAX;
 
 /* Public Functions =======================================================> */
 
-/* Initializes a plane metadata within the given `planeMetadata`. */
-bool dzPlaneInitMetadata(dzPlaneMetadata *planeMetadata,
-                         dzPlaneConfig config) {
-    if (planeMetadata == NULL) return false;
+/* Initializes a plane metadata within the given `metadata` region. */
+bool dzPlaneInitMetadata(dzPlaneMetadata *metadata, dzPlaneConfig config) {
+    if (metadata == NULL) return false;
 
     {
-        planeMetadata->planeId = config.planeId;
+        metadata->planeId = config.planeId;
 
         // TODO: ...
     }

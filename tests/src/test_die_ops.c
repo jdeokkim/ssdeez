@@ -94,26 +94,37 @@ TEST dzTestPageOps(void) {
 
     ASSERT_LTE(srcBuffer.size, dieConfig.pageSizeInBytes);
 
-    for (dzU64 i = 0, j = dzDieGetPageCount(die); i < j; i++) {
-        ASSERT_EQ(true, dzDieProgramPage(die, i, srcBuffer));
+    // clang-format off
+
+    for (dzPPA ppa = dzDieGetFirstPPA(die);
+             ppa.pageId != DZ_PAGE_INVALID_ID;
+             ppa = dzDieGetNextPPA(die, ppa)) {
+        ASSERT_EQ(true, dzDieProgramPage(die, ppa, srcBuffer));
 
         // NOTE: This page is already programmed!
-        ASSERT_EQ(false, dzDieProgramPage(die, i, srcBuffer));
+        ASSERT_EQ(false, dzDieProgramPage(die, ppa, srcBuffer));
     }
+
+    // clang-format on
 
     dzByte dstData[sizeof srcData];
 
     dzSizedBuffer dstBuffer = { .ptr = (dzByte *) dstData,
                                 .size = sizeof dstData };
 
-    for (dzU64 i = 0, j = dzDieGetPageCount(die); i < j; i++) {
+    // clang-format off
+
+    for (dzPPA ppa = dzDieGetFirstPPA(die); ppa.pageId != DZ_PAGE_INVALID_ID;
+         ppa = dzDieGetNextPPA(die, ppa)) {
         // NOTE: Making sure `dzDieReadPage()` is doing its job well
         memset(dstBuffer.ptr, 0xFF, dstBuffer.size);
 
-        ASSERT_EQ(true, dzDieReadPage(die, i, dstBuffer));
+        ASSERT_EQ(true, dzDieReadPage(die, ppa, dstBuffer));
 
         ASSERT_MEM_EQ(srcBuffer.ptr, dstBuffer.ptr, srcBuffer.size);
     }
+
+    // clang-format on
 
     PASS();
 }
@@ -136,8 +147,14 @@ TEST dzTestBlockOps(void) {
     ASSERT_LTE(srcBuffer.size, dieConfig.pageSizeInBytes);
 
     {
-        for (dzU64 i = 0, j = dzDieGetPageCount(die); i < j; i++)
-            (void) dzDieProgramPage(die, i, srcBuffer);
+        // clang-format off
+        
+        for (dzPPA ppa = dzDieGetFirstPPA(die);
+             ppa.pageId != DZ_PAGE_INVALID_ID;
+             ppa = dzDieGetNextPPA(die, ppa))
+            (void) dzDieProgramPage(die, ppa, srcBuffer);
+
+        // clang-format on
     }
 
     for (dzU64 i = 0, j = dzDieGetBlockCount(die); i < j; i++) {
@@ -157,13 +174,19 @@ TEST dzTestBlockOps(void) {
         dzSizedBuffer dstBuffer = { .ptr = (dzByte *) dstData,
                                     .size = sizeof dstData };
 
-        for (dzU64 i = 0, j = dzDieGetPageCount(die); i < j; i++) {
-            ASSERT_EQ(true, dzDieReadPage(die, i, dstBuffer));
+        // clang-format off
+
+        for (dzPPA ppa = dzDieGetFirstPPA(die);
+             ppa.pageId != DZ_PAGE_INVALID_ID;
+             ppa = dzDieGetNextPPA(die, ppa)) {
+            ASSERT_EQ(true, dzDieReadPage(die, ppa, dstBuffer));
 
             // NOTE: Check if all pages have been initialized to `0xFF`
             for (dzU64 k = 0; k < sizeof dstBuffer; k++)
                 ASSERT_EQ((dzByte) 0xFF, dstBuffer.ptr[k]);
         }
+
+        // clang-format on
     }
 
     PASS();
