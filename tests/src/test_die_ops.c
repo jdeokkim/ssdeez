@@ -94,25 +94,18 @@ TEST dzTestPageOps(void) {
 
     ASSERT_LTE(srcBuffer.size, dieConfig.pageSizeInBytes);
 
-    // clang-format off
-
-    for (dzPPA ppa = dzDieGetFirstPPA(die);
-             ppa.pageId != DZ_PAGE_INVALID_ID;
-             ppa = dzDieGetNextPPA(die, ppa)) {
+    for (dzPPA ppa = dzDieGetFirstPPA(die); ppa.pageId != DZ_PAGE_INVALID_ID;
+         ppa = dzDieGetNextPPA(die, ppa)) {
         ASSERT_EQ(true, dzDieProgramPage(die, ppa, srcBuffer));
 
         // NOTE: This page is already programmed!
         ASSERT_EQ(false, dzDieProgramPage(die, ppa, srcBuffer));
     }
 
-    // clang-format on
-
     dzByte dstData[sizeof srcData];
 
     dzSizedBuffer dstBuffer = { .ptr = (dzByte *) dstData,
                                 .size = sizeof dstData };
-
-    // clang-format off
 
     for (dzPPA ppa = dzDieGetFirstPPA(die); ppa.pageId != DZ_PAGE_INVALID_ID;
          ppa = dzDieGetNextPPA(die, ppa)) {
@@ -123,8 +116,6 @@ TEST dzTestPageOps(void) {
 
         ASSERT_MEM_EQ(srcBuffer.ptr, dstBuffer.ptr, srcBuffer.size);
     }
-
-    // clang-format on
 
     PASS();
 }
@@ -147,25 +138,22 @@ TEST dzTestBlockOps(void) {
     ASSERT_LTE(srcBuffer.size, dieConfig.pageSizeInBytes);
 
     {
-        // clang-format off
-        
         for (dzPPA ppa = dzDieGetFirstPPA(die);
              ppa.pageId != DZ_PAGE_INVALID_ID;
              ppa = dzDieGetNextPPA(die, ppa))
             (void) dzDieProgramPage(die, ppa, srcBuffer);
-
-        // clang-format on
     }
 
-    for (dzU64 i = 0, j = dzDieGetBlockCount(die); i < j; i++) {
-        ASSERT_EQ(DZ_BLOCK_STATE_VALID, dzDieGetBlockState(die, i));
+    for (dzPPA pba = dzDieGetFirstPBA(die); pba.blockId != DZ_PAGE_INVALID_ID;
+         pba = dzDieGetNextPBA(die, pba)) {
+        ASSERT_EQ(DZ_BLOCK_STATE_VALID, dzDieGetBlockState(die, pba));
 
-        ASSERT_EQ(true, dzDieEraseBlock(die, i));
+        ASSERT_EQ(true, dzDieEraseBlock(die, pba));
 
-        ASSERT_EQ(DZ_BLOCK_STATE_FREE, dzDieGetBlockState(die, i));
+        ASSERT_EQ(DZ_BLOCK_STATE_FREE, dzDieGetBlockState(die, pba));
 
         // NOTE: Free blocks should not be erased again
-        ASSERT_EQ(false, dzDieEraseBlock(die, i));
+        ASSERT_EQ(false, dzDieEraseBlock(die, pba));
     }
 
     {
@@ -173,8 +161,6 @@ TEST dzTestBlockOps(void) {
 
         dzSizedBuffer dstBuffer = { .ptr = (dzByte *) dstData,
                                     .size = sizeof dstData };
-
-        // clang-format off
 
         for (dzPPA ppa = dzDieGetFirstPPA(die);
              ppa.pageId != DZ_PAGE_INVALID_ID;
@@ -185,8 +171,6 @@ TEST dzTestBlockOps(void) {
             for (dzU64 k = 0; k < sizeof dstBuffer; k++)
                 ASSERT_EQ((dzByte) 0xFF, dstBuffer.ptr[k]);
         }
-
-        // clang-format on
     }
 
     PASS();

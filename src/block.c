@@ -69,8 +69,6 @@ bool dzBlockInitMetadata(dzBlockMetadata *metadata, dzBlockConfig config) {
     if (metadata == NULL) return false;
 
     {
-        metadata->blockId = config.blockId;
-
         metadata->totalEraseCount = 0U;
         // metadata->lastEraseTime = 0.0;
 
@@ -88,7 +86,7 @@ dzUSize dzBlockGetMetadataSize(void) {
 }
 
 /* Returns the current state of a block. */
-dzBlockState dzBlockGetState(dzBlockMetadata *metadata) {
+dzBlockState dzBlockGetState(const dzBlockMetadata *metadata) {
     return (metadata != NULL) ? metadata->state : DZ_BLOCK_STATE_UNKNOWN;
 }
 

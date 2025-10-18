@@ -37,7 +37,7 @@ extern "C" {
 
 /* Macros =================================================================> */
 
-/* Compiler-specific attribute for a function that must be inlined. */
+/* Compiler-specific attribute for a function that must be always inlined. */
 #ifndef DZ_API_INLINE
     #ifdef _MSC_VER
         #define DZ_API_INLINE __forceinline
@@ -50,6 +50,8 @@ extern "C" {
     #else
         #define DZ_API_INLINE inline
     #endif
+
+    #define DZ_API_PRIVATE_INLINE static DZ_API_INLINE
 #endif  // `DZ_API_INLINE`
 
 /* Ignores the "unused parameter" and "unused variable" errors. */
@@ -152,6 +154,9 @@ typedef struct dzPPA_ {
     dzU64 pageId;
 } dzPPA;
 
+/* A structure that represents a physical block address. */
+typedef dzPPA dzPBA;
+
 /* ========================================================================> */
 
 /* A structure that represents a group of NAND flash planes. */
@@ -188,7 +193,6 @@ typedef struct dzPlaneMetadata_ dzPlaneMetadata;
 
 /* A structure that represents the configuration of a NAND flash block. */
 typedef struct dzBlockConfig_ {
-    dzU64 blockId;
     dzCellType cellType;
     // TODO: ...
 } dzBlockConfig;
@@ -245,7 +249,7 @@ bool dzBlockInitMetadata(dzBlockMetadata *metadata, dzBlockConfig config);
 dzUSize dzBlockGetMetadataSize(void);
 
 /* Returns the current state of a block. */
-dzBlockState dzBlockGetState(dzBlockMetadata *metadata);
+dzBlockState dzBlockGetState(const dzBlockMetadata *metadata);
 
 /* Marks a block as bad. */
 bool dzBlockMarkAsBad(dzBlockMetadata *metadata);
@@ -267,14 +271,20 @@ void dzDieRelease(dzDie *die);
 /* Returns the total number of blocks in `die`. */
 dzU64 dzDieGetBlockCount(const dzDie *die);
 
-/* Returns the current state of the `blockId`-th block in `die`. */
-dzBlockState dzDieGetBlockState(const dzDie *die, dzU64 blockId);
+/* Returns the current state of the block corresponding to `pba` in `die`. */
+dzBlockState dzDieGetBlockState(const dzDie *die, dzPBA pba);
 
 /* Returns the total number of pages in `die`. */
 dzU64 dzDieGetPageCount(const dzDie *die);
 
-/* Returns the first physical page address in `die`. */
+/* Returns the first physical block address within `die`. */
+dzPBA dzDieGetFirstPBA(const dzDie *die);
+
+/* Returns the first physical page address within `die`. */
 dzPPA dzDieGetFirstPPA(const dzDie *die);
+
+/* Returns the next physical block address following `ppa` within `die`. */
+dzPBA dzDieGetNextPBA(const dzDie *die, dzPBA pba);
 
 /* Returns the next physical page address following `ppa` within `die`. */
 dzPPA dzDieGetNextPPA(const dzDie *die, dzPPA ppa);
@@ -291,8 +301,8 @@ bool dzDieProgramPage(dzDie *die, dzPPA ppa, dzSizedBuffer srcBuffer);
 */
 bool dzDieReadPage(dzDie *die, dzPPA ppa, dzSizedBuffer dstBuffer);
 
-/* Erases the `blockId`-th block in `die`. */
-bool dzDieEraseBlock(dzDie *die, dzU64 blockId);
+/* Erases the block corresponding to `pba` in `die`. */
+bool dzDieEraseBlock(dzDie *die, dzPBA pba);
 
 /* <------------------------------------------------------------ [src/page.c] */
 

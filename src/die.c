@@ -102,18 +102,20 @@ static bool dzDieInitMetadata(dzDie *die);
 
 /* ========================================================================> */
 
-/* Returns the metadata of the `blockId`-th block in `die`. */
-static DZ_API_INLINE dzBlockMetadata *dzDieBlockIdToMetadata(const dzDie *die,
-                                                             dzU64 blockId);
+/* 
+    Returns `true` if `pba` is pointing to the 
+    valid physical block address within `die`.
+*/
+DZ_API_PRIVATE_INLINE dzBool dzDieIsValidPBA(const dzDie *die, dzPBA pba);
 
 /* 
     Returns `true` if `ppa` is pointing to the 
     valid physical page address within `die`.
 */
-static DZ_API_INLINE dzBool dzDieIsValidPPA(const dzDie *die, dzPPA ppa);
+DZ_API_PRIVATE_INLINE dzBool dzDieIsValidPPA(const dzDie *die, dzPPA ppa);
 
 /* Returns the pointer to a page corresponding to `ppa` in `die`. */
-static DZ_API_INLINE dzByte *dzDiePPAToPtr(const dzDie *die, dzPPA ppa);
+DZ_API_PRIVATE_INLINE dzByte *dzDiePPAToPtr(const dzDie *die, dzPPA ppa);
 
 /* Public Functions =======================================================> */
 
@@ -169,9 +171,16 @@ dzU64 dzDieGetBlockCount(const dzDie *die) {
     return (die != NULL) ? die->metadata.blockCountPerDie : 0U;
 }
 
-/* Returns the current state of the `blockId`-th block in `die`. */
-dzBlockState dzDieGetBlockState(const dzDie *die, dzU64 blockId) {
-    dzBlockMetadata *blockMetadata = dzDieBlockIdToMetadata(die, blockId);
+/* Returns the current state of the block corresponding to `pba` in `die`. */
+dzBlockState dzDieGetBlockState(const dzDie *die, dzPBA pba) {
+    if (!dzDieIsValidPBA(die, pba)) return DZ_BLOCK_STATE_UNKNOWN;
+
+    dzU64 blockIndex = (pba.planeId * die->config.blockCountPerPlane)
+                       + pba.blockId;
+
+    const dzBlockMetadata *blockMetadata =
+        (const dzBlockMetadata *) (((dzByte *) die->metadata.blocks)
+                                   + (blockIndex * dzBlockGetMetadataSize()));
 
     return dzBlockGetState(blockMetadata);
 }
@@ -181,7 +190,16 @@ dzU64 dzDieGetPageCount(const dzDie *die) {
     return (die != NULL) ? die->metadata.pageCountPerDie : 0U;
 }
 
-/* Returns the first physical page address in `die`. */
+/* Returns the first physical block address within `die`. */
+dzPBA dzDieGetFirstPBA(const dzDie *die) {
+    return (dzPBA) { .chipId = DZ_CHIP_INVALID_ID,
+                     .dieId = ((die != NULL) ? die->config.dieId
+                                             : DZ_DIE_INVALID_ID),
+                     .planeId = ((die != NULL) ? 0U : DZ_PLANE_INVALID_ID),
+                     .blockId = ((die != NULL) ? 0U : DZ_BLOCK_INVALID_ID) };
+}
+
+/* Returns the first physical page address within `die`. */
 dzPPA dzDieGetFirstPPA(const dzDie *die) {
     return (dzPPA) { .chipId = DZ_CHIP_INVALID_ID,
                      .dieId = ((die != NULL) ? die->config.dieId
@@ -191,15 +209,38 @@ dzPPA dzDieGetFirstPPA(const dzDie *die) {
                      .pageId = ((die != NULL) ? 0U : DZ_PAGE_INVALID_ID) };
 }
 
+/* Returns the next physical block address following `ppa` within `die`. */
+dzPBA dzDieGetNextPBA(const dzDie *die, dzPBA pba) {
+    // clang-format off
+
+    if (!dzDieIsValidPBA(die, pba))
+        return (dzPBA) {
+            .chipId = DZ_CHIP_INVALID_ID, 
+            .dieId = DZ_DIE_INVALID_ID,
+            .planeId = DZ_PLANE_INVALID_ID, 
+            .blockId = DZ_BLOCK_INVALID_ID
+        };
+
+    // clang-format on
+
+    pba.blockId++;
+
+    if (pba.blockId >= die->config.blockCountPerPlane)
+        pba.planeId++, pba.blockId = 0U;
+
+    return (pba.planeId < die->config.planeCountPerDie)
+               ? pba
+               : ((dzPBA) { .chipId = DZ_CHIP_INVALID_ID,
+                            .dieId = DZ_DIE_INVALID_ID,
+                            .planeId = DZ_PLANE_INVALID_ID,
+                            .blockId = DZ_BLOCK_INVALID_ID });
+}
+
 /* Returns the next physical page address following `ppa` within `die`. */
 dzPPA dzDieGetNextPPA(const dzDie *die, dzPPA ppa) {
     // clang-format off
 
-    if (die == NULL 
-        || ppa.dieId != die->config.dieId
-        || ppa.planeId >= die->config.planeCountPerDie
-        || ppa.blockId >= die->config.blockCountPerPlane
-        || ppa.pageId >= die->config.pageCountPerBlock)
+    if (!dzDieIsValidPPA(die, ppa))
         return (dzPPA) {
             .chipId = DZ_CHIP_INVALID_ID, 
             .dieId = DZ_DIE_INVALID_ID,
@@ -242,9 +283,12 @@ bool dzDieProgramPage(dzDie *die, dzPPA ppa, dzSizedBuffer srcBuffer) {
         return false;
 
     {
-        dzU64 blockId = ppa.blockId;
+        dzU64 blockIndex = (ppa.planeId * die->config.blockCountPerPlane)
+                           + ppa.blockId;
 
-        dzBlockMetadata *blockMetadata = dzDieBlockIdToMetadata(die, blockId);
+        dzBlockMetadata *blockMetadata =
+            (dzBlockMetadata *) (((dzByte *) die->metadata.blocks)
+                                 + (blockIndex * dzBlockGetMetadataSize()));
 
         if (!dzBlockMarkAsValid(blockMetadata)) return false;
     }
@@ -304,13 +348,16 @@ bool dzDieReadPage(dzDie *die, dzPPA ppa, dzSizedBuffer dstBuffer) {
     return true;
 }
 
-/* Erases the `blockId`-th block in `die`. */
-bool dzDieEraseBlock(dzDie *die, dzU64 blockId) {
-    if (die == NULL || blockId >= die->metadata.blockCountPerDie) return false;
+/* Erases the block corresponding to `pba` in `die`. */
+bool dzDieEraseBlock(dzDie *die, dzPBA pba) {
+    if (die == NULL || !dzDieIsValidPBA(die, pba)) return false;
 
     bool result = true;
 
-    dzDieForEachPageInBlock(die->buffer, die->metadata, blockId, pagePtr) {
+    dzU64 blockIndex = (pba.planeId * die->config.blockCountPerPlane)
+                       + pba.blockId;
+
+    dzDieForEachPageInBlock(die->buffer, die->metadata, blockIndex, pagePtr) {
         (void) memset(pagePtr, 0xFF, die->config.pageSizeInBytes);
 
         if (!dzPageMarkAsFree(pagePtr, die->config.pageSizeInBytes)) {
@@ -320,14 +367,16 @@ bool dzDieEraseBlock(dzDie *die, dzU64 blockId) {
         }
     }
 
-    dzBlockMetadata *blockMetadata = dzDieBlockIdToMetadata(die, blockId);
+    dzBlockMetadata *blockMetadata =
+        (dzBlockMetadata *) (((dzByte *) die->metadata.blocks)
+                             + (blockIndex * dzBlockGetMetadataSize()));
 
     if (!result) {
         /* NOTE: Mark all pages in the block as bad */
 
         // clang-format off
 
-        dzDieForEachPageInBlock(die->buffer, die->metadata, blockId, pagePtr)
+        dzDieForEachPageInBlock(die->buffer, die->metadata, blockIndex, pagePtr)
             ((void) dzPageMarkAsBad(pagePtr, die->config.pageSizeInBytes));
 
         // clang-format on
@@ -448,11 +497,12 @@ static bool dzDieInitMetadata(dzDie *die) {
         // TODO: ...
 
         for (dzU64 i = 0U; i < die->metadata.blockCountPerDie; i++) {
-            dzBlockMetadata *blockMetadata = dzDieBlockIdToMetadata(die, i);
+            dzBlockMetadata *blockMetadata =
+                (dzBlockMetadata *) (((dzByte *) die->metadata.blocks)
+                                     + (i * dzBlockGetMetadataSize()));
 
             dzBlockConfig blockConfig;
 
-            blockConfig.blockId = i;
             blockConfig.cellType = die->config.cellType;
 
             if (!dzBlockInitMetadata(blockMetadata, blockConfig)) {
@@ -468,29 +518,40 @@ static bool dzDieInitMetadata(dzDie *die) {
 
 /* ========================================================================> */
 
-/* Returns the metadata of the `blockId`-th block in `die`. */
-static DZ_API_INLINE dzBlockMetadata *dzDieBlockIdToMetadata(const dzDie *die,
-                                                             dzU64 blockId) {
-    return (die != NULL && (blockId < die->metadata.blockCountPerDie))
-               ? (dzBlockMetadata *) (((dzByte *) die->metadata.blocks)
-                                      + (blockId * dzBlockGetMetadataSize()))
-               : NULL;
+/* 
+    Returns `true` if `pba` is pointing to the 
+    valid physical block address within `die`.
+*/
+DZ_API_PRIVATE_INLINE dzBool dzDieIsValidPBA(const dzDie *die, dzPBA pba) {
+    // clang-format off
+
+    return (die != NULL 
+            && pba.dieId == die->config.dieId
+            && pba.planeId < die->config.planeCountPerDie
+            && pba.blockId < die->config.blockCountPerPlane);
+
+    // clang-format on
 }
 
 /* 
     Returns `true` if `ppa` is pointing to the 
     valid physical page address within `die`.
 */
-static DZ_API_INLINE dzBool dzDieIsValidPPA(const dzDie *die, dzPPA ppa) {
-    return (ppa.dieId == die->config.dieId
+DZ_API_PRIVATE_INLINE dzBool dzDieIsValidPPA(const dzDie *die, dzPPA ppa) {
+    // clang-format off
+
+    return (die != NULL 
+            && ppa.dieId == die->config.dieId
             && ppa.planeId < die->config.planeCountPerDie
             && ppa.blockId < die->config.blockCountPerPlane
             && ppa.pageId < die->config.pageCountPerBlock);
+
+    // clang-format on
 }
 
 /* Returns the pointer to a page corresponding to `ppa` in `die`. */
-static DZ_API_INLINE dzByte *dzDiePPAToPtr(const dzDie *die, dzPPA ppa) {
-    if (die == NULL || !dzDieIsValidPPA(die, ppa)) return NULL;
+DZ_API_PRIVATE_INLINE dzByte *dzDiePPAToPtr(const dzDie *die, dzPPA ppa) {
+    if (!dzDieIsValidPPA(die, ppa)) return NULL;
 
     dzUSize pageSize = die->metadata.physicalPageSize;
     dzUSize blockSize = (die->config.pageCountPerBlock * pageSize);
