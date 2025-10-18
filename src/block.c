@@ -32,8 +32,8 @@
 
 /* A structure that represents the metadata of a NAND flash block. */
 struct dzBlockMetadata_ {
-    dzU64 blockId;
-    // dzU64 nextPageId;
+    dzU64 nextPageId;
+    dzU64 lastPageId;
     dzU64 totalEraseCount;
     // dzF64 lastEraseTime;
     dzCellType cellType;
@@ -69,6 +69,9 @@ bool dzBlockInitMetadata(dzBlockMetadata *metadata, dzBlockConfig config) {
     if (metadata == NULL) return false;
 
     {
+        metadata->nextPageId = 0U;
+        metadata->lastPageId = config.lastPageId;
+
         metadata->totalEraseCount = 0U;
         // metadata->lastEraseTime = 0.0;
 
@@ -85,9 +88,30 @@ dzUSize dzBlockGetMetadataSize(void) {
     return sizeof(dzBlockMetadata);
 }
 
+/* Writes the next page identifier of a block to `nextPageId`. */
+bool dzBlockGetNextPageId(dzBlockMetadata *metadata, dzU64 *nextPageId) {
+    if (metadata == NULL || nextPageId == NULL) return false;
+
+    *nextPageId = metadata->nextPageId;
+
+    return true;
+}
+
 /* Returns the current state of a block. */
 dzBlockState dzBlockGetState(const dzBlockMetadata *metadata) {
     return (metadata != NULL) ? metadata->state : DZ_BLOCK_STATE_UNKNOWN;
+}
+
+/* Advances the next page identifier of a block. */
+bool dzBlockAdvanceNextPageId(dzBlockMetadata *metadata) {
+    if (metadata == NULL) return false;
+
+    metadata->nextPageId++;
+
+    if (metadata->nextPageId >= metadata->lastPageId)
+        metadata->nextPageId = DZ_PAGE_INVALID_ID;
+
+    return true;
 }
 
 /* Marks a block as bad. */

@@ -193,6 +193,7 @@ typedef struct dzPlaneMetadata_ dzPlaneMetadata;
 
 /* A structure that represents the configuration of a NAND flash block. */
 typedef struct dzBlockConfig_ {
+    dzU64 lastPageId;
     dzCellType cellType;
     // TODO: ...
 } dzBlockConfig;
@@ -248,8 +249,14 @@ bool dzBlockInitMetadata(dzBlockMetadata *metadata, dzBlockConfig config);
 /* Returns the size of `dzBlockMetadata`. */
 dzUSize dzBlockGetMetadataSize(void);
 
+/* Writes the next page identifier of a block to `nextPageId`. */
+bool dzBlockGetNextPageId(dzBlockMetadata *metadata, dzU64 *nextPageId);
+
 /* Returns the current state of a block. */
 dzBlockState dzBlockGetState(const dzBlockMetadata *metadata);
+
+/* Advances the next page identifier of a block. */
+bool dzBlockAdvanceNextPageId(dzBlockMetadata *metadata);
 
 /* Marks a block as bad. */
 bool dzBlockMarkAsBad(dzBlockMetadata *metadata);

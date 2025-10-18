@@ -290,7 +290,16 @@ bool dzDieProgramPage(dzDie *die, dzPPA ppa, dzSizedBuffer srcBuffer) {
             (dzBlockMetadata *) (((dzByte *) die->metadata.blocks)
                                  + (blockIndex * dzBlockGetMetadataSize()));
 
-        if (!dzBlockMarkAsValid(blockMetadata)) return false;
+        dzU64 nextPageId = DZ_PAGE_INVALID_ID;
+
+        // NOTE: Enforce "Sequential Page Programming"
+        if (!dzBlockGetNextPageId(blockMetadata, &nextPageId)
+            || ppa.pageId != nextPageId)
+            return false;
+
+        if (!dzBlockAdvanceNextPageId(blockMetadata)
+            || !dzBlockMarkAsValid(blockMetadata))
+            return false;
     }
 
     {
@@ -503,6 +512,7 @@ static bool dzDieInitMetadata(dzDie *die) {
 
             dzBlockConfig blockConfig;
 
+            blockConfig.lastPageId = die->config.pageCountPerBlock;
             blockConfig.cellType = die->config.cellType;
 
             if (!dzBlockInitMetadata(blockMetadata, blockConfig)) {

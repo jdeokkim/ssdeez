@@ -41,7 +41,7 @@ I present SSDeez, a lightweight NAND flash-based SSD simulator written in C99, f
     - [ ] Valid Page Count
   - [x] Erase Operations
   - [x] Randomized Erase Latencies
-  - [ ] Sequential Programming
+  - [x] Sequential Page Programming
 - Plane
 - Die
 - Chip (Package)
