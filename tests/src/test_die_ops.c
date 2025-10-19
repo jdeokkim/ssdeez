@@ -146,7 +146,7 @@ TEST dzTestBlockOps(void) {
 
     for (dzPPA pba = dzDieGetFirstPBA(die); pba.blockId != DZ_PAGE_INVALID_ID;
          pba = dzDieGetNextPBA(die, pba)) {
-        ASSERT_EQ(DZ_BLOCK_STATE_VALID, dzDieGetBlockState(die, pba));
+        ASSERT_EQ(DZ_BLOCK_STATE_ACTIVE, dzDieGetBlockState(die, pba));
 
         ASSERT_EQ(true, dzDieEraseBlock(die, pba));
 

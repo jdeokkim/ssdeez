@@ -6,6 +6,10 @@
 
 # SSDeez 🥜
 
+[![CodeFactor](https://www.codefactor.io/repository/github/jdeokkim/ssdeez/badge)](https://www.codefactor.io/repository/github/jdeokkim/ssdeez)
+[![Code Size](https://img.shields.io/github/languages/code-size/jdeokkim/ssdeez?color=brightgreen)](https://github.com/jdeokkim/ssdeez)
+[![License](https://img.shields.io/github/license/jdeokkim/ssdeez)](https://github.com/jdeokkim/ssdeez/blob/main/LICENSE)
+
 I present SSDeez, a lightweight NAND flash-based SSD simulator written in C99, for educational purposes.
 
 </div>
@@ -32,13 +36,11 @@ I present SSDeez, a lightweight NAND flash-based SSD simulator written in C99, f
     - [x] Randomized Program/Read Latencies
     - [ ] Read Disturbance 
 - Block
-  - [x] Block States (Free, Valid, Bad, etc.)
+  - [x] Block States (Free, Active, Bad, etc.)
   - [ ] Block-Level Statistics
-    - [ ] Bad Page Count
-    - [ ] Free Page Count
     - [ ] Last Erase Time
+    - [x] Page State Bitmap
     - [x] Total Erase Count
-    - [ ] Valid Page Count
   - [x] Erase Operations
   - [x] Randomized Erase Latencies
   - [x] Sequential Page Programming

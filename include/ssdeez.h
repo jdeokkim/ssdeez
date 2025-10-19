@@ -116,7 +116,8 @@ typedef double        dzF64;
 typedef enum dzBlockState_ {
     DZ_BLOCK_STATE_UNKNOWN = -1,
     DZ_BLOCK_STATE_FREE,
-    DZ_BLOCK_STATE_VALID,
+    DZ_BLOCK_STATE_VICTIM,
+    DZ_BLOCK_STATE_ACTIVE,
     DZ_BLOCK_STATE_BAD,
     DZ_BLOCK_STATE_RESERVED,
     DZ_BLOCK_STATE_COUNT_
@@ -126,6 +127,7 @@ typedef enum dzBlockState_ {
 typedef enum dzPageState_ {
     DZ_PAGE_STATE_UNKNOWN = -1,
     DZ_PAGE_STATE_FREE,
+    DZ_PAGE_STATE_INVALID,
     DZ_PAGE_STATE_VALID,
     DZ_PAGE_STATE_BAD,
     DZ_PAGE_STATE_RESERVED,
@@ -193,6 +195,7 @@ typedef struct dzPlaneMetadata_ dzPlaneMetadata;
 
 /* A structure that represents the configuration of a NAND flash block. */
 typedef struct dzBlockConfig_ {
+    dzPBA pba;
     dzU64 lastPageId;
     dzCellType cellType;
     // TODO: ...
@@ -205,7 +208,7 @@ typedef struct dzBlockMetadata_ dzBlockMetadata;
 
 /* A structure that represents the configuration of a NAND flash page. */
 typedef struct dzPageConfig_ {
-    dzPPA physicalPageAddress;
+    dzPPA ppa;
     dzF64 peCycleCountPenalty;
     dzU32 pageSizeInBytes;
     dzCellType cellType;
@@ -243,8 +246,11 @@ extern const dzU64 DZ_PAGE_INVALID_ID;
 
 /* <---------------------------------------------------------- [src/block.c] */
 
-/* Initializes a block metadata within the given `metadata` region. */
+/* Initializes a block `metadata` within the given region. */
 bool dzBlockInitMetadata(dzBlockMetadata *metadata, dzBlockConfig config);
+
+/* De-initializes the block `metadata`. */
+void dzBlockDeinitMetadata(dzBlockMetadata *metadata);
 
 /* Returns the size of `dzBlockMetadata`. */
 dzUSize dzBlockGetMetadataSize(void);
@@ -255,6 +261,9 @@ bool dzBlockGetNextPageId(dzBlockMetadata *metadata, dzU64 *nextPageId);
 /* Returns the current state of a block. */
 dzBlockState dzBlockGetState(const dzBlockMetadata *metadata);
 
+/* Returns the number of valid pages in a block. */
+dzU64 dzBlockGetValidPageCount(const dzBlockMetadata *metadata);
+
 /* Advances the next page identifier of a block. */
 bool dzBlockAdvanceNextPageId(dzBlockMetadata *metadata);
 
@@ -264,8 +273,12 @@ bool dzBlockMarkAsBad(dzBlockMetadata *metadata);
 /* Marks a block as free. */
 bool dzBlockMarkAsFree(dzBlockMetadata *metadata, dzF64 *eraseLatency);
 
-/* Marks a block as valid. */
-bool dzBlockMarkAsValid(dzBlockMetadata *metadata);
+/* Marks a block as active. */
+bool dzBlockMarkAsActive(dzBlockMetadata *metadata);
+
+/* Updates the state of the next page within a block's page state map. */
+bool dzBlockUpdatePageStateMap(dzBlockMetadata *metadata,
+                               dzPageState pageState);
 
 /* <------------------------------------------------------------ [src/die.c] */
 

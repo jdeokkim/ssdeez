@@ -32,7 +32,7 @@
 
 /* A structure that represents the metadata of a NAND flash page. */
 struct dzPageMetadata_ {
-    dzPPA physicalPageAddress;
+    dzPPA ppa;
     dzU64 totalProgramCount;
     dzU64 totalReadCount;
     // dzF64 lastProgramTime;
@@ -81,7 +81,7 @@ const dzU64 DZ_PAGE_INVALID_ID = UINT64_MAX;
 /* Private Function Prototypes ============================================> */
 
 /* Returns `true` if `cellType` is a valid NAND flash cell type. */
-static DZ_API_INLINE bool dzIsValidCellType(dzCellType cellType);
+DZ_API_PRIVATE_INLINE bool dzIsValidCellType(dzCellType cellType);
 
 /* Public Functions =======================================================> */
 
@@ -95,7 +95,7 @@ bool dzPageInitMetadata(dzByte *pagePtr, dzPageConfig config) {
         (dzPageMetadata *) (pagePtr + config.pageSizeInBytes);
 
     {
-        pageMetadata->physicalPageAddress = config.physicalPageAddress;
+        pageMetadata->ppa = config.ppa;
 
         pageMetadata->totalProgramCount = 0U;
         pageMetadata->totalReadCount = 0U;
@@ -135,7 +135,7 @@ dzUSize dzPageGetMetadataSize(void) {
 
 /* Returns the physical page address of a page. */
 dzPPA dzPageGetPPA(const dzByte *pagePtr, dzU32 pageSizeInBytes) {
-    if (pagePtr == NULL)
+    if (pagePtr == NULL || pageSizeInBytes == 0U)
         return (dzPPA) { .dieId = DZ_DIE_INVALID_ID,
                          .planeId = DZ_PLANE_INVALID_ID,
                          .blockId = DZ_BLOCK_INVALID_ID,
@@ -144,7 +144,7 @@ dzPPA dzPageGetPPA(const dzByte *pagePtr, dzU32 pageSizeInBytes) {
     dzPageMetadata *pageMetadata = (dzPageMetadata *) (pagePtr
                                                        + pageSizeInBytes);
 
-    return pageMetadata->physicalPageAddress;
+    return pageMetadata->ppa;
 }
 
 /* Returns the current state of a page. */
@@ -161,10 +161,13 @@ dzPageState dzPageGetState(const dzByte *pagePtr, dzU32 pageSizeInBytes) {
 bool dzPageGetReadLatency(const dzByte *pagePtr,
                           dzU32 pageSizeInBytes,
                           dzF64 *readLatency) {
-    if (pagePtr == NULL || readLatency == NULL) return false;
+    if (pagePtr == NULL || pageSizeInBytes == 0U || readLatency == NULL)
+        return false;
 
     dzPageMetadata *pageMetadata = (dzPageMetadata *) (pagePtr
                                                        + pageSizeInBytes);
+
+    pageMetadata->totalReadCount++;
 
     *readLatency =
         dzUtilsGaussian(readLatencyTable[pageMetadata->cellType],
@@ -236,6 +239,6 @@ bool dzPageMarkAsValid(dzByte *pagePtr,
 /* Private Functions ======================================================> */
 
 /* Returns `true` if `cellType` is a valid NAND flash cell type. */
-static DZ_API_INLINE bool dzIsValidCellType(dzCellType cellType) {
+DZ_API_PRIVATE_INLINE bool dzIsValidCellType(dzCellType cellType) {
     return (cellType > DZ_CELL_TYPE_UNKNOWN && cellType < DZ_CELL_TYPE_COUNT_);
 }

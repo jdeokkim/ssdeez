@@ -22,6 +22,8 @@
 
 /* Includes ===============================================================> */
 
+#include <string.h>
+
 #include "ssdeez.h"
 
 /* Macros =================================================================> */
@@ -32,8 +34,9 @@
 
 /* A structure that represents the metadata of a NAND flash block. */
 struct dzBlockMetadata_ {
-    dzU64 nextPageId;
-    dzU64 lastPageId;
+    dzByte *pageStateMap;
+    dzPBA pba;
+    dzU64 nextPageId, lastPageId;
     dzU64 totalEraseCount;
     // dzF64 lastEraseTime;
     dzCellType cellType;
@@ -69,6 +72,18 @@ bool dzBlockInitMetadata(dzBlockMetadata *metadata, dzBlockConfig config) {
     if (metadata == NULL) return false;
 
     {
+        dzU64 totalPageCount = config.lastPageId + 1;
+
+        metadata->pageStateMap = malloc(totalPageCount
+                                        * sizeof *(metadata->pageStateMap));
+
+        for (dzU64 i = 0U; i < totalPageCount; i++)
+            metadata->pageStateMap[i] = DZ_PAGE_STATE_FREE;
+    }
+
+    {
+        metadata->pba = config.pba;
+
         metadata->nextPageId = 0U;
         metadata->lastPageId = config.lastPageId;
 
@@ -81,6 +96,13 @@ bool dzBlockInitMetadata(dzBlockMetadata *metadata, dzBlockConfig config) {
     }
 
     return true;
+}
+
+/* De-initializes the block `metadata`. */
+void dzBlockDeinitMetadata(dzBlockMetadata *metadata) {
+    if (metadata == NULL) return;
+
+    free(metadata->pageStateMap);
 }
 
 /* Returns the size of `dzBlockMetadata`. */
@@ -102,13 +124,26 @@ dzBlockState dzBlockGetState(const dzBlockMetadata *metadata) {
     return (metadata != NULL) ? metadata->state : DZ_BLOCK_STATE_UNKNOWN;
 }
 
+/* Returns the number of valid pages in a block. */
+dzU64 dzBlockGetValidPageCount(const dzBlockMetadata *metadata) {
+    if (metadata == NULL) return 0U;
+
+    dzU64 validPageCount = 0U;
+
+    for (dzU64 i = 0U; i <= metadata->lastPageId; i++)
+        if (metadata->pageStateMap[i] == DZ_PAGE_STATE_VALID)
+            validPageCount++;
+
+    return validPageCount;
+}
+
 /* Advances the next page identifier of a block. */
 bool dzBlockAdvanceNextPageId(dzBlockMetadata *metadata) {
     if (metadata == NULL) return false;
 
     metadata->nextPageId++;
 
-    if (metadata->nextPageId >= metadata->lastPageId)
+    if (metadata->nextPageId > metadata->lastPageId)
         metadata->nextPageId = DZ_PAGE_INVALID_ID;
 
     return true;
@@ -120,6 +155,12 @@ bool dzBlockMarkAsBad(dzBlockMetadata *metadata) {
         return false;
 
     metadata->state = DZ_BLOCK_STATE_BAD;
+
+    metadata->nextPageId = DZ_PAGE_INVALID_ID;
+
+    memset(metadata->pageStateMap,
+           DZ_PAGE_STATE_BAD,
+           metadata->lastPageId + 1);
 
     return true;
 }
@@ -133,6 +174,10 @@ bool dzBlockMarkAsFree(dzBlockMetadata *metadata, dzF64 *eraseLatency) {
 
     metadata->state = DZ_BLOCK_STATE_FREE;
 
+    memset(metadata->pageStateMap,
+           DZ_PAGE_STATE_FREE,
+           metadata->lastPageId + 1);
+
     *eraseLatency =
         dzUtilsGaussian(eraseLatencyTable[metadata->cellType],
                         DZ_BLOCK_ERASE_LATENCY_STDDEV_RATIO
@@ -141,12 +186,28 @@ bool dzBlockMarkAsFree(dzBlockMetadata *metadata, dzF64 *eraseLatency) {
     return true;
 }
 
-/* Marks a block as valid. */
-bool dzBlockMarkAsValid(dzBlockMetadata *metadata) {
+/* Marks a block as active. */
+bool dzBlockMarkAsActive(dzBlockMetadata *metadata) {
     if (metadata == NULL || metadata->state == DZ_BLOCK_STATE_BAD)
         return false;
 
-    metadata->state = DZ_BLOCK_STATE_VALID;
+    metadata->state = DZ_BLOCK_STATE_ACTIVE;
+
+    memset(metadata->pageStateMap,
+           DZ_PAGE_STATE_VALID,
+           metadata->lastPageId + 1);
+
+    return true;
+}
+
+/* Updates the state of the next page within a block's page state map. */
+bool dzBlockUpdatePageStateMap(dzBlockMetadata *metadata,
+                               dzPageState pageState) {
+    if (metadata == NULL || metadata->nextPageId == DZ_PAGE_INVALID_ID
+        || metadata->pageStateMap == NULL)
+        return false;
+
+    metadata->pageStateMap[metadata->nextPageId] = pageState;
 
     return true;
 }

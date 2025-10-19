@@ -163,6 +163,14 @@ dzDie *dzDieCreate(dzDieConfig config) {
 void dzDieRelease(dzDie *die) {
     if (die == NULL) return;
 
+    for (dzU64 i = 0U; i < die->metadata.blockCountPerDie; i++) {
+        dzBlockMetadata *blockMetadata =
+            (dzBlockMetadata *) (((dzByte *) die->metadata.blocks)
+                                 + (i * dzBlockGetMetadataSize()));
+
+        dzBlockDeinitMetadata(blockMetadata);
+    }
+
     free(die->metadata.planes), free(die->buffer), free(die);
 }
 
@@ -282,23 +290,19 @@ bool dzDieProgramPage(dzDie *die, dzPPA ppa, dzSizedBuffer srcBuffer) {
     if (pagePtr == NULL || srcBuffer.ptr == NULL || srcBuffer.size == 0U)
         return false;
 
+    dzU64 blockIndex = (ppa.planeId * die->config.blockCountPerPlane)
+                       + ppa.blockId;
+
+    dzBlockMetadata *blockMetadata =
+        (dzBlockMetadata *) (((dzByte *) die->metadata.blocks)
+                             + (blockIndex * dzBlockGetMetadataSize()));
+
     {
-        dzU64 blockIndex = (ppa.planeId * die->config.blockCountPerPlane)
-                           + ppa.blockId;
-
-        dzBlockMetadata *blockMetadata =
-            (dzBlockMetadata *) (((dzByte *) die->metadata.blocks)
-                                 + (blockIndex * dzBlockGetMetadataSize()));
-
         dzU64 nextPageId = DZ_PAGE_INVALID_ID;
 
         // NOTE: Enforce "Sequential Page Programming"
         if (!dzBlockGetNextPageId(blockMetadata, &nextPageId)
             || ppa.pageId != nextPageId)
-            return false;
-
-        if (!dzBlockAdvanceNextPageId(blockMetadata)
-            || !dzBlockMarkAsValid(blockMetadata))
             return false;
     }
 
@@ -314,6 +318,20 @@ bool dzDieProgramPage(dzDie *die, dzPPA ppa, dzSizedBuffer srcBuffer) {
 
         die->stats.totalProgramLatency += programLatency;
         die->stats.totalProgramCount++;
+    }
+
+    {
+        dzPageState pageState = dzDieGetPageState(die, ppa);
+
+        if (!dzBlockUpdatePageStateMap(blockMetadata, pageState)) return false;
+
+        /*
+            NOTE: Since at least one valid page is present in this block, 
+                  it can be marked as valid
+        */
+        if (!dzBlockAdvanceNextPageId(blockMetadata)
+            || !dzBlockMarkAsActive(blockMetadata))
+            return false;
     }
 
     (void) memcpy(pagePtr,
@@ -440,7 +458,7 @@ static dzByte *dzDieCreateBuffer(dzDieConfig config, dzDieMetadata metadata) {
                                     * DZ_PAGE_PE_CYCLE_COUNT_MAX_PENALTY);
         }
 
-        dzPPA physicalPageAddress = {
+        dzPPA ppa = {
             .dieId = config.dieId,
             .planeId = pageIndex / metadata.pageCountPerPlane,
             .blockId = (pageIndex % metadata.pageCountPerPlane)
@@ -449,7 +467,7 @@ static dzByte *dzDieCreateBuffer(dzDieConfig config, dzDieMetadata metadata) {
             // TODO: ...
         };
 
-        dzPageConfig pageConfig = { .physicalPageAddress = physicalPageAddress,
+        dzPageConfig pageConfig = { .ppa = ppa,
                                     .peCycleCountPenalty = peCycleCountPenalty,
                                     .pageSizeInBytes = config.pageSizeInBytes,
                                     .cellType = config.cellType };
@@ -505,6 +523,8 @@ static bool dzDieInitMetadata(dzDie *die) {
 
         // TODO: ...
 
+        dzPBA pba = dzDieGetFirstPBA(die);
+
         for (dzU64 i = 0U; i < die->metadata.blockCountPerDie; i++) {
             dzBlockMetadata *blockMetadata =
                 (dzBlockMetadata *) (((dzByte *) die->metadata.blocks)
@@ -512,7 +532,8 @@ static bool dzDieInitMetadata(dzDie *die) {
 
             dzBlockConfig blockConfig;
 
-            blockConfig.lastPageId = die->config.pageCountPerBlock;
+            blockConfig.pba = pba;
+            blockConfig.lastPageId = die->config.pageCountPerBlock - 1;
             blockConfig.cellType = die->config.cellType;
 
             if (!dzBlockInitMetadata(blockMetadata, blockConfig)) {
@@ -520,6 +541,8 @@ static bool dzDieInitMetadata(dzDie *die) {
 
                 return false;
             }
+
+            pba = dzDieGetNextPBA(die, pba);
         }
     }
 
