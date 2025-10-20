@@ -171,6 +171,14 @@ void dzDieRelease(dzDie *die) {
         dzBlockDeinitMetadata(blockMetadata);
     }
 
+    for (dzU64 i = 0U; i < die->config.planeCountPerDie; i++) {
+        dzPlaneMetadata *planeMetadata =
+            (dzPlaneMetadata *) (((dzByte *) die->metadata.planes)
+                                 + (i * dzPlaneGetMetadataSize()));
+
+        dzPlaneDeinitMetadata(planeMetadata);
+    }
+
     free(die->metadata.planes), free(die->buffer), free(die);
 }
 
@@ -521,7 +529,22 @@ static bool dzDieInitMetadata(dzDie *die) {
         die->metadata.blocks = (dzBlockMetadata *) (extraBuffer
                                                     + totalPlaneMetadataSize);
 
-        // TODO: ...
+        for (dzU64 i = 0U; i < die->config.planeCountPerDie; i++) {
+            dzPlaneMetadata *planeMetadata =
+                (dzPlaneMetadata *) (((dzByte *) die->metadata.planes)
+                                     + (i * dzPlaneGetMetadataSize()));
+
+            dzPlaneConfig planeConfig;
+
+            planeConfig.planeId = i;
+            planeConfig.blockCount = die->config.blockCountPerPlane;
+
+            if (!dzPlaneInitMetadata(planeMetadata, planeConfig)) {
+                dzDieRelease(die);
+
+                return false;
+            }
+        }
 
         dzPBA pba = dzDieGetFirstPBA(die);
 
@@ -533,7 +556,7 @@ static bool dzDieInitMetadata(dzDie *die) {
             dzBlockConfig blockConfig;
 
             blockConfig.pba = pba;
-            blockConfig.lastPageId = die->config.pageCountPerBlock - 1;
+            blockConfig.pageCount = die->config.pageCountPerBlock;
             blockConfig.cellType = die->config.cellType;
 
             if (!dzBlockInitMetadata(blockMetadata, blockConfig)) {

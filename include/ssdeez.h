@@ -185,6 +185,7 @@ typedef struct dzDieStatistics_ dzDieStatistics;
 /* A structure that represents the configuration of a NAND flash plane. */
 typedef struct dzPlaneConfig_ {
     dzU64 planeId;
+    dzU64 blockCount;
     // TODO: ...
 } dzPlaneConfig;
 
@@ -196,7 +197,7 @@ typedef struct dzPlaneMetadata_ dzPlaneMetadata;
 /* A structure that represents the configuration of a NAND flash block. */
 typedef struct dzBlockConfig_ {
     dzPBA pba;
-    dzU64 lastPageId;
+    dzU64 pageCount;
     dzCellType cellType;
     // TODO: ...
 } dzBlockConfig;
@@ -359,6 +360,9 @@ bool dzPageMarkAsValid(dzByte *pagePtr,
 /* Initializes a plane metadata within the given `metadata` region. */
 bool dzPlaneInitMetadata(dzPlaneMetadata *metadata, dzPlaneConfig config);
 
+/* De-initializes the plane `metadata`. */
+void dzPlaneDeinitMetadata(dzPlaneMetadata *metadata);
+
 /* Returns the size of `dzPlaneMetadata`. */
 dzUSize dzPlaneGetMetadataSize(void);
 
@@ -366,6 +370,12 @@ dzUSize dzPlaneGetMetadataSize(void);
 
 /* Returns a pseudo-random number from a Gaussian distribution. */
 dzF64 dzUtilsGaussian(dzF64 mu, dzF64 sigma);
+
+/* Returns a pseudo-random number in the given range. */
+dzF64 dzUtilsRandRange(dzF64 min, dzF64 max);
+
+/* Returns a pseudo-random number from an uniform distribution. */
+dzF64 dzUtilsUniform(void);
 
 /* ========================================================================> */
 

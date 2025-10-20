@@ -32,6 +32,8 @@
 
 /* A structure that represents the metadata of a NAND flash plane. */
 struct dzPlaneMetadata_ {
+    dzByte *blockStateMap;
+    dzU64 blockCount;
     dzU64 planeId;
     // TODO: ...
 };
@@ -56,12 +58,29 @@ bool dzPlaneInitMetadata(dzPlaneMetadata *metadata, dzPlaneConfig config) {
     if (metadata == NULL) return false;
 
     {
+        metadata->blockStateMap = malloc(config.blockCount
+                                        * sizeof *(metadata->blockStateMap));
+
+        for (dzU64 i = 0U; i < config.blockCount; i++)
+            metadata->blockStateMap[i] = DZ_BLOCK_STATE_FREE;
+    }
+
+    {
+        metadata->blockCount = config.blockCount;
+
         metadata->planeId = config.planeId;
 
         // TODO: ...
     }
 
     return true;
+}
+
+/* De-initializes the plane `metadata`. */
+void dzPlaneDeinitMetadata(dzPlaneMetadata *metadata) {
+    if (metadata == NULL) return;
+
+    free(metadata->blockStateMap);
 }
 
 /* Returns the size of `dzPlaneMetadata`. */

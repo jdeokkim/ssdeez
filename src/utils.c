@@ -22,7 +22,6 @@
 
 /* Includes ===============================================================> */
 
-#include <float.h>
 #include <limits.h>
 #include <math.h>
 
@@ -38,11 +37,7 @@
 
 /* Constants ==============================================================> */
 
-/* 
-    Special constant for `dzUtilsGaussian()`, 
-    in order to avoid explicit `dzF64` conversions. 
-*/
-static const dzF64 INVERSE_UINT64_MAX = 1.0 / ((dzF64) UINT64_MAX);
+// TODO: ...
 
 /* Private Variables ======================================================> */
 
@@ -51,8 +46,11 @@ static dzU64 prngStates[4] = { 0x2025, 0x0926, 0x2116, 0x1200 };
 
 /* Private Function Prototypes ============================================> */
 
-/* Returns the next pseudo-random number from the xoshiro256++ generator. */
-static DZ_API_INLINE dzU64 dzUtilsRand(void);
+/* Returns the next pseudo-random number from the xoshiro256+ generator. */
+DZ_API_PRIVATE_INLINE dzU64 dzUtilsXoshiroPlus(void);
+
+/* Returns a pseudo-random number from an uniform distribution. */
+DZ_API_PRIVATE_INLINE dzF64 dzUtilsUniform_(void);
 
 /* Public Functions =======================================================> */
 
@@ -65,7 +63,7 @@ dzF64 dzUtilsGaussian(dzF64 mu, dzF64 sigma) {
 
     static dzBool hasNextValue = false;
 
-    static dzF64 nextValue = DBL_EPSILON;
+    static dzF64 nextValue = 0.0;
 
     if (hasNextValue) {
         hasNextValue = !hasNextValue;
@@ -75,13 +73,13 @@ dzF64 dzUtilsGaussian(dzF64 mu, dzF64 sigma) {
         dzF64 x, y, r;
 
         do {
-            x = 2.0 * ((dzF64) dzUtilsRand() * INVERSE_UINT64_MAX) - 1.0;
-            y = 2.0 * ((dzF64) dzUtilsRand() * INVERSE_UINT64_MAX) - 1.0;
+            x = (2.0 * dzUtilsUniform_()) - 1.0;
+            y = (2.0 * dzUtilsUniform_()) - 1.0;
 
             r = x * x + y * y;
         } while (r >= 1.0 || r == 0.0);
 
-        r = sqrt(-2.0 * (log(r) / r));
+        r = sqrt((-2.0 * log(r)) / r);
 
         nextValue = y * r, hasNextValue = !hasNextValue;
 
@@ -89,10 +87,20 @@ dzF64 dzUtilsGaussian(dzF64 mu, dzF64 sigma) {
     }
 }
 
+/* Returns a pseudo-random number in the given range. */
+dzF64 dzUtilsRandRange(dzF64 min, dzF64 max) {
+    return min + ((max - min) * dzUtilsUniform_());
+}
+
+/* Returns a pseudo-random number from an uniform distribution. */
+dzF64 dzUtilsUniform(void) {
+    return dzUtilsUniform_();
+}
+
 /* Private Functions ======================================================> */
 
-/* Returns the next pseudo-random number from the xoshiro256++ generator. */
-static DZ_API_INLINE dzU64 dzUtilsRand(void) {
+/* Returns the next pseudo-random number from the xoshiro256+ generator. */
+DZ_API_PRIVATE_INLINE dzU64 dzUtilsXoshiroPlus(void) {
     /*
         NOTE: The original code was written in 2019
               by David Blackman and Sebastiano Vigna.
@@ -100,8 +108,7 @@ static DZ_API_INLINE dzU64 dzUtilsRand(void) {
               (https://prng.di.unimi.it)
     */
 
-    dzU64 result = BITWISE_ROTATE_LEFT_U64(prngStates[0] + prngStates[3], 23)
-                   + prngStates[0];
+    dzU64 result = prngStates[0] + prngStates[3];
 
     {
         const dzU64 tempValue = prngStates[1] << 17;
@@ -117,4 +124,10 @@ static DZ_API_INLINE dzU64 dzUtilsRand(void) {
     }
 
     return result;
+}
+
+/* Returns a pseudo-random number from an uniform distribution. */
+DZ_API_PRIVATE_INLINE dzF64 dzUtilsUniform_(void) {
+    // NOTE: Extract the upper 53 bits, then multiply by 2^(-53)
+    return 1.11022302462515654e-16 * ((dzF64) (dzUtilsXoshiroPlus() >> 11));
 }

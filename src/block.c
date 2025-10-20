@@ -36,7 +36,8 @@
 struct dzBlockMetadata_ {
     dzByte *pageStateMap;
     dzPBA pba;
-    dzU64 nextPageId, lastPageId;
+    dzU64 pageCount;
+    dzU64 nextPageId;
     dzU64 totalEraseCount;
     // dzF64 lastEraseTime;
     dzCellType cellType;
@@ -72,20 +73,18 @@ bool dzBlockInitMetadata(dzBlockMetadata *metadata, dzBlockConfig config) {
     if (metadata == NULL) return false;
 
     {
-        dzU64 totalPageCount = config.lastPageId + 1;
-
-        metadata->pageStateMap = malloc(totalPageCount
+        metadata->pageStateMap = malloc(config.pageCount
                                         * sizeof *(metadata->pageStateMap));
 
-        for (dzU64 i = 0U; i < totalPageCount; i++)
+        for (dzU64 i = 0U; i < config.pageCount; i++)
             metadata->pageStateMap[i] = DZ_PAGE_STATE_FREE;
     }
 
     {
         metadata->pba = config.pba;
 
+        metadata->pageCount = config.pageCount;
         metadata->nextPageId = 0U;
-        metadata->lastPageId = config.lastPageId;
 
         metadata->totalEraseCount = 0U;
         // metadata->lastEraseTime = 0.0;
@@ -130,9 +129,8 @@ dzU64 dzBlockGetValidPageCount(const dzBlockMetadata *metadata) {
 
     dzU64 validPageCount = 0U;
 
-    for (dzU64 i = 0U; i <= metadata->lastPageId; i++)
-        if (metadata->pageStateMap[i] == DZ_PAGE_STATE_VALID)
-            validPageCount++;
+    for (dzU64 i = 0U; i < metadata->pageCount; i++)
+        validPageCount += (metadata->pageStateMap[i] == DZ_PAGE_STATE_VALID);
 
     return validPageCount;
 }
@@ -143,7 +141,7 @@ bool dzBlockAdvanceNextPageId(dzBlockMetadata *metadata) {
 
     metadata->nextPageId++;
 
-    if (metadata->nextPageId > metadata->lastPageId)
+    if (metadata->nextPageId >= metadata->pageCount)
         metadata->nextPageId = DZ_PAGE_INVALID_ID;
 
     return true;
@@ -158,9 +156,7 @@ bool dzBlockMarkAsBad(dzBlockMetadata *metadata) {
 
     metadata->nextPageId = DZ_PAGE_INVALID_ID;
 
-    memset(metadata->pageStateMap,
-           DZ_PAGE_STATE_BAD,
-           metadata->lastPageId + 1);
+    memset(metadata->pageStateMap, DZ_PAGE_STATE_BAD, metadata->pageCount);
 
     return true;
 }
@@ -174,9 +170,9 @@ bool dzBlockMarkAsFree(dzBlockMetadata *metadata, dzF64 *eraseLatency) {
 
     metadata->state = DZ_BLOCK_STATE_FREE;
 
-    memset(metadata->pageStateMap,
-           DZ_PAGE_STATE_FREE,
-           metadata->lastPageId + 1);
+    memset(metadata->pageStateMap, DZ_PAGE_STATE_FREE, metadata->pageCount);
+
+    metadata->totalEraseCount++;
 
     *eraseLatency =
         dzUtilsGaussian(eraseLatencyTable[metadata->cellType],
@@ -193,9 +189,7 @@ bool dzBlockMarkAsActive(dzBlockMetadata *metadata) {
 
     metadata->state = DZ_BLOCK_STATE_ACTIVE;
 
-    memset(metadata->pageStateMap,
-           DZ_PAGE_STATE_VALID,
-           metadata->lastPageId + 1);
+    memset(metadata->pageStateMap, DZ_PAGE_STATE_VALID, metadata->pageCount);
 
     return true;
 }
