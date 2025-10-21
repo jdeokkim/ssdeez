@@ -284,7 +284,10 @@ dzPPA dzDieGetNextPPA(const dzDie *die, dzPPA ppa) {
                             .pageId = DZ_PAGE_INVALID_ID });
 }
 
-/* Returns the current state of the page corresponding to `ppa` within `die`. */
+/* 
+    Returns the current state of the page 
+    corresponding to `ppa` within `die`. 
+*/
 dzPageState dzDieGetPageState(const dzDie *die, dzPPA ppa) {
     const dzByte *pagePtr = (const dzByte *) dzDiePPAToPtr(die, ppa);
 
@@ -454,7 +457,7 @@ static dzByte *dzDieCreateBuffer(dzDieConfig config, dzDieMetadata metadata) {
         dzF64 peCycleCountPenalty = 1.0;
 
         // NOTE: Pages in the top and bottom layers should have lower endurance
-        if (metadata.pageCountPerDie > 2) {
+        if (metadata.pageCountPerDie >= 2) {
             dzU64 distanceFromCenter = (pageIndex > centerPageIndex)
                                            ? (pageIndex - centerPageIndex)
                                            : (centerPageIndex - pageIndex);

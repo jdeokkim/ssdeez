@@ -310,7 +310,10 @@ dzPBA dzDieGetNextPBA(const dzDie *die, dzPBA pba);
 /* Returns the next physical page address following `ppa` within `die`. */
 dzPPA dzDieGetNextPPA(const dzDie *die, dzPPA ppa);
 
-/* Returns the current state of the page corresponding to `ppa` within `die`. */
+/* 
+    Returns the current state of the page 
+    corresponding to `ppa` within `die`. 
+*/
 dzPageState dzDieGetPageState(const dzDie *die, dzPPA ppa);
 
 /* Writes `srcBuffer` to the page corresponding to `ppa` in `die`. */
@@ -325,7 +328,7 @@ bool dzDieReadPage(dzDie *die, dzPPA ppa, dzSizedBuffer dstBuffer);
 /* Erases the block corresponding to `pba` in `die`. */
 bool dzDieEraseBlock(dzDie *die, dzPBA pba);
 
-/* <------------------------------------------------------------ [src/page.c] */
+/* <----------------------------------------------------------- [src/page.c] */
 
 /* Initializes a page metadata within the given `pagePtr`. */
 bool dzPageInitMetadata(dzByte *pagePtr, dzPageConfig config);
