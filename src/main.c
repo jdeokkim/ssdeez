@@ -22,12 +22,78 @@
 
 /* Includes ===============================================================> */
 
-// TODO: ...
+#include <stdio.h>
+#include <stdlib.h>
+
+#define OPTPARSE_IMPLEMENTATION
+#include "external/optparse.h"
+
+#include "ssdeez.h"
+
+/* Private Function Prototypes ============================================> */
+
+static void dzMainShowUsage(char *programName, char *errorMessage);
 
 /* Public Functions =======================================================> */
 
-int main(void) {
+int main(int argc, char *argv[]) {
+    DZ_API_UNUSED_VARIABLE(argc);
+
+    struct optparse options;
+
+    optparse_init(&options, argv);
+
+    int option = -1;
+
+    while ((option = optparse(&options, "c:p:t:")) != -1) {
+        switch (option) {
+            case 'c':
+                // TODO: ...
+
+                break;
+
+            case 'p':
+                // TODO: ...
+                
+                break;
+
+            case 't':
+                // TODO: ...
+                
+                break;
+
+            case '?':
+                dzMainShowUsage(argv[0], options.errmsg);
+
+                break;
+        }
+    }
+
     // TODO: ...
 
     return 0;
+}
+
+/* Private Functions ======================================================> */
+
+static void dzMainShowUsage(char *programName, char *errorMessage) {
+    // clang-format off
+
+    (void) fprintf(
+        stderr, 
+        "%s: %s\n"
+        "\n"
+        "Usage: %s -c config_file [-p preset | -t trace_file]\n"
+        "\n"
+        "Options:\n"
+        "  -c config_file   Specify the path to the SSD configuration file\n"
+        "  -p preset        Specify which pre-defined workload definition to use\n"
+        "  -t trace_file    Specify the path to the workload trace file\n",
+        programName, errorMessage, 
+        programName
+    );
+
+    // clang-format on
+
+    exit(EXIT_FAILURE);
 }
