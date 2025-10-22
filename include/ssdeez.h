@@ -64,6 +64,12 @@ extern "C" {
 /* Specifies the standard deviation ratio for the erase latency. */
 #define DZ_BLOCK_ERASE_LATENCY_STDDEV_RATIO    0.05
 
+/* Specifies the minimum ratio for factory bad blocks in a die. */
+#define DZ_BLOCK_FACTORY_BAD_BLOCK_MIN_RATIO   0.001
+
+/* Specifies the maximum ratio for factory bad blocks in a die. */
+#define DZ_BLOCK_FACTORY_BAD_BLOCK_MAX_RATIO   0.01
+
 /*
     Specifies how much space the OOB (Out-Of-Band) area takes up,
     in relation to the total page size.
@@ -268,14 +274,17 @@ dzU64 dzBlockGetValidPageCount(const dzBlockMetadata *metadata);
 /* Advances the next page identifier of a block. */
 bool dzBlockAdvanceNextPageId(dzBlockMetadata *metadata);
 
+/* Marks a block as active. */
+bool dzBlockMarkAsActive(dzBlockMetadata *metadata);
+
 /* Marks a block as bad. */
 bool dzBlockMarkAsBad(dzBlockMetadata *metadata);
 
 /* Marks a block as free. */
 bool dzBlockMarkAsFree(dzBlockMetadata *metadata, dzF64 *eraseLatency);
 
-/* Marks a block as active. */
-bool dzBlockMarkAsActive(dzBlockMetadata *metadata);
+/* Marks a block as unknown. */
+bool dzBlockMarkAsUnknown(dzBlockMetadata *metadata);
 
 /* Updates the state of the next page within a block's page state map. */
 bool dzBlockUpdatePageStateMap(dzBlockMetadata *metadata,
@@ -353,6 +362,9 @@ bool dzPageMarkAsBad(dzByte *pagePtr, dzU32 pageSizeInBytes);
 /* Marks a page as free. */
 bool dzPageMarkAsFree(dzByte *pagePtr, dzU32 pageSizeInBytes);
 
+/* Marks a page as unknown. */
+bool dzPageMarkAsUnknown(dzByte *pagePtr, dzU32 pageSizeInBytes);
+
 /* Marks a page as valid. */
 bool dzPageMarkAsValid(dzByte *pagePtr,
                        dzU32 pageSizeInBytes,
@@ -374,8 +386,17 @@ dzUSize dzPlaneGetMetadataSize(void);
 /* Returns a pseudo-random number from a Gaussian distribution. */
 dzF64 dzUtilsGaussian(dzF64 mu, dzF64 sigma);
 
-/* Returns a pseudo-random number in the given range. */
-dzF64 dzUtilsRandRange(dzF64 min, dzF64 max);
+/* 
+    Returns a pseudo-random double-precision floating-point number 
+    in the given (exclusive) range. 
+*/
+dzF64 dzUtilsRandRangeF64(dzF64 min, dzF64 max);
+
+/* 
+    Returns a pseudo-random unsigned 64-bit integer 
+    in the given (inclusive) range. 
+*/
+dzU64 dzUtilsRandRangeU64(dzU64 min, dzU64 max);
 
 /* Returns a pseudo-random number from an uniform distribution. */
 dzF64 dzUtilsUniform(void);

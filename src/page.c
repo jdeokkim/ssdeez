@@ -212,6 +212,18 @@ bool dzPageMarkAsFree(dzByte *pagePtr, dzU32 pageSizeInBytes) {
     return true;
 }
 
+/* Marks a page as unknown. */
+bool dzPageMarkAsUnknown(dzByte *pagePtr, dzU32 pageSizeInBytes) {
+    if (pagePtr == NULL || pageSizeInBytes == 0U) return false;
+
+    dzPageMetadata *pageMetadata = (dzPageMetadata *) (pagePtr
+                                                       + pageSizeInBytes);
+
+    pageMetadata->state = DZ_PAGE_STATE_UNKNOWN;
+
+    return true;
+}
+
 /* Marks a page as valid. */
 bool dzPageMarkAsValid(dzByte *pagePtr,
                        dzU32 pageSizeInBytes,

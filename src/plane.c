@@ -59,7 +59,7 @@ bool dzPlaneInitMetadata(dzPlaneMetadata *metadata, dzPlaneConfig config) {
 
     {
         metadata->blockStateMap = malloc(config.blockCount
-                                        * sizeof *(metadata->blockStateMap));
+                                         * sizeof *(metadata->blockStateMap));
 
         for (dzU64 i = 0U; i < config.blockCount; i++)
             metadata->blockStateMap[i] = DZ_BLOCK_STATE_FREE;

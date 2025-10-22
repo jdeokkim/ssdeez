@@ -23,6 +23,7 @@
 /* Includes ===============================================================> */
 
 #include <float.h>
+#include <math.h>
 #include <string.h>
 
 #include "ssdeez.h"
@@ -96,6 +97,12 @@ const dzU64 DZ_DIE_INVALID_ID = UINT64_MAX;
 
 /* Creates a die buffer with the given `config` and `metadata`. */
 static dzByte *dzDieCreateBuffer(dzDieConfig config, dzDieMetadata metadata);
+
+/* Initializes all block metadata in `die.` */
+static bool dzDieInitBlockMetadata(dzDie *die);
+
+/* Initializes all plane metadata in `die.` */
+static bool dzDieInitPlaneMetadata(dzDie *die);
 
 /* Initializes a `die` metadata. */
 static bool dzDieInitMetadata(dzDie *die);
@@ -234,12 +241,13 @@ dzPBA dzDieGetNextPBA(const dzDie *die, dzPBA pba) {
             .chipId = DZ_CHIP_INVALID_ID, 
             .dieId = DZ_DIE_INVALID_ID,
             .planeId = DZ_PLANE_INVALID_ID, 
-            .blockId = DZ_BLOCK_INVALID_ID
+            .blockId = DZ_BLOCK_INVALID_ID,
+            .pageId = DZ_PAGE_INVALID_ID
         };
 
     // clang-format on
 
-    pba.blockId++;
+    pba.pageId = 0U, pba.blockId++;
 
     if (pba.blockId >= die->config.blockCountPerPlane)
         pba.planeId++, pba.blockId = 0U;
@@ -249,7 +257,8 @@ dzPBA dzDieGetNextPBA(const dzDie *die, dzPBA pba) {
                : ((dzPBA) { .chipId = DZ_CHIP_INVALID_ID,
                             .dieId = DZ_DIE_INVALID_ID,
                             .planeId = DZ_PLANE_INVALID_ID,
-                            .blockId = DZ_BLOCK_INVALID_ID });
+                            .blockId = DZ_BLOCK_INVALID_ID,
+                            .pageId = DZ_PAGE_INVALID_ID });
 }
 
 /* Returns the next physical page address following `ppa` within `die`. */
@@ -495,6 +504,76 @@ static dzByte *dzDieCreateBuffer(dzDieConfig config, dzDieMetadata metadata) {
     return result;
 }
 
+/* Initializes all block metadata in `die.` */
+static bool dzDieInitBlockMetadata(dzDie *die) {
+    if (die == NULL) return false;
+
+    dzPBA pba = dzDieGetFirstPBA(die);
+
+    dzU64 blockCountPerDie = die->metadata.blockCountPerDie;
+
+    for (dzU64 i = 0U; i < blockCountPerDie; i++) {
+        dzBlockMetadata *blockMetadata =
+            (dzBlockMetadata *) (((dzByte *) die->metadata.blocks)
+                                 + (i * dzBlockGetMetadataSize()));
+
+        dzBlockConfig blockConfig;
+
+        blockConfig.pba = pba;
+        blockConfig.pageCount = die->config.pageCountPerBlock;
+        blockConfig.cellType = die->config.cellType;
+
+        if (!dzBlockInitMetadata(blockMetadata, blockConfig)) return false;
+
+        pba = dzDieGetNextPBA(die, pba);
+    }
+
+    dzF64 factoryBadBlockRatio =
+        dzUtilsRandRangeF64(DZ_BLOCK_FACTORY_BAD_BLOCK_MIN_RATIO,
+                            DZ_BLOCK_FACTORY_BAD_BLOCK_MAX_RATIO);
+
+    dzU64 factoryBadBlockCount = (dzU64) ceil(factoryBadBlockRatio
+                                              * (dzF64) blockCountPerDie);
+
+    if (factoryBadBlockCount == 0) factoryBadBlockCount++;
+
+    while (factoryBadBlockCount > 0) {
+        dzU64 badBlockIndex = dzUtilsRandRangeU64(0U, blockCountPerDie - 1);
+
+        dzBlockMetadata *blockMetadata =
+            (dzBlockMetadata *) (((dzByte *) die->metadata.blocks)
+                                 + (badBlockIndex * dzBlockGetMetadataSize()));
+
+        DZ_API_UNUSED_VARIABLE(blockMetadata);
+
+        // TODO: ...
+
+        factoryBadBlockCount--;
+    }
+
+    return true;
+}
+
+/* Initializes all plane metadata in `die.` */
+static bool dzDieInitPlaneMetadata(dzDie *die) {
+    if (die == NULL) return false;
+
+    for (dzU64 i = 0U; i < die->config.planeCountPerDie; i++) {
+        dzPlaneMetadata *planeMetadata =
+            (dzPlaneMetadata *) (((dzByte *) die->metadata.planes)
+                                 + (i * dzPlaneGetMetadataSize()));
+
+        dzPlaneConfig planeConfig;
+
+        planeConfig.planeId = i;
+        planeConfig.blockCount = die->config.blockCountPerPlane;
+
+        if (!dzPlaneInitMetadata(planeMetadata, planeConfig)) return false;
+    }
+
+    return true;
+}
+
 /* Initializes a `die` metadata. */
 static bool dzDieInitMetadata(dzDie *die) {
     if (die == NULL) return false;
@@ -521,10 +600,8 @@ static bool dzDieInitMetadata(dzDie *die) {
         dzUSize totalBlockMetadataSize = die->metadata.blockCountPerDie
                                          * dzBlockGetMetadataSize();
 
-        dzUSize extraBufferSize = totalPlaneMetadataSize
-                                  + totalBlockMetadataSize;
-
-        dzByte *extraBuffer = malloc(extraBufferSize);
+        dzByte *extraBuffer = malloc(totalPlaneMetadataSize
+                                     + totalBlockMetadataSize);
 
         if (extraBuffer == NULL) return false;
 
@@ -532,43 +609,10 @@ static bool dzDieInitMetadata(dzDie *die) {
         die->metadata.blocks = (dzBlockMetadata *) (extraBuffer
                                                     + totalPlaneMetadataSize);
 
-        for (dzU64 i = 0U; i < die->config.planeCountPerDie; i++) {
-            dzPlaneMetadata *planeMetadata =
-                (dzPlaneMetadata *) (((dzByte *) die->metadata.planes)
-                                     + (i * dzPlaneGetMetadataSize()));
+        if (!dzDieInitPlaneMetadata(die) || !dzDieInitBlockMetadata(die)) {
+            dzDieRelease(die);
 
-            dzPlaneConfig planeConfig;
-
-            planeConfig.planeId = i;
-            planeConfig.blockCount = die->config.blockCountPerPlane;
-
-            if (!dzPlaneInitMetadata(planeMetadata, planeConfig)) {
-                dzDieRelease(die);
-
-                return false;
-            }
-        }
-
-        dzPBA pba = dzDieGetFirstPBA(die);
-
-        for (dzU64 i = 0U; i < die->metadata.blockCountPerDie; i++) {
-            dzBlockMetadata *blockMetadata =
-                (dzBlockMetadata *) (((dzByte *) die->metadata.blocks)
-                                     + (i * dzBlockGetMetadataSize()));
-
-            dzBlockConfig blockConfig;
-
-            blockConfig.pba = pba;
-            blockConfig.pageCount = die->config.pageCountPerBlock;
-            blockConfig.cellType = die->config.cellType;
-
-            if (!dzBlockInitMetadata(blockMetadata, blockConfig)) {
-                dzDieRelease(die);
-
-                return false;
-            }
-
-            pba = dzDieGetNextPBA(die, pba);
+            return false;
         }
     }
 

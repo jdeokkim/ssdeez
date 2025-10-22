@@ -45,21 +45,16 @@ int main(int argc, char *argv[]) {
 
     int option = -1;
 
-    while ((option = optparse(&options, "c:p:t:")) != -1) {
+    while ((option = optparse(&options, "c:t:")) != -1) {
         switch (option) {
             case 'c':
                 // TODO: ...
 
                 break;
 
-            case 'p':
-                // TODO: ...
-                
-                break;
-
             case 't':
                 // TODO: ...
-                
+
                 break;
 
             case '?':
@@ -83,12 +78,11 @@ static void dzMainShowUsage(char *programName, char *errorMessage) {
         stderr, 
         "%s: %s\n"
         "\n"
-        "Usage: %s -c config_file [-p preset | -t trace_file]\n"
+        "Usage: %s -c config [-t trace_file]\n"
         "\n"
         "Options:\n"
-        "  -c config_file   Specify the path to the SSD configuration file\n"
-        "  -p preset        Specify which pre-defined workload definition to use\n"
-        "  -t trace_file    Specify the path to the workload trace file\n",
+        "  -c config    Specify the path to the SSD configuration file\n"
+        "  -t trace     Specify the path to the workload trace file\n",
         programName, errorMessage, 
         programName
     );

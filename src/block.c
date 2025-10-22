@@ -147,6 +147,18 @@ bool dzBlockAdvanceNextPageId(dzBlockMetadata *metadata) {
     return true;
 }
 
+/* Marks a block as active. */
+bool dzBlockMarkAsActive(dzBlockMetadata *metadata) {
+    if (metadata == NULL || metadata->state == DZ_BLOCK_STATE_BAD)
+        return false;
+
+    metadata->state = DZ_BLOCK_STATE_ACTIVE;
+
+    memset(metadata->pageStateMap, DZ_PAGE_STATE_VALID, metadata->pageCount);
+
+    return true;
+}
+
 /* Marks a block as bad. */
 bool dzBlockMarkAsBad(dzBlockMetadata *metadata) {
     if (metadata == NULL || metadata->state == DZ_BLOCK_STATE_FREE)
@@ -182,14 +194,13 @@ bool dzBlockMarkAsFree(dzBlockMetadata *metadata, dzF64 *eraseLatency) {
     return true;
 }
 
-/* Marks a block as active. */
-bool dzBlockMarkAsActive(dzBlockMetadata *metadata) {
-    if (metadata == NULL || metadata->state == DZ_BLOCK_STATE_BAD)
-        return false;
+/* Marks a block as unknown. */
+bool dzBlockMarkAsUnknown(dzBlockMetadata *metadata) {
+    if (metadata == NULL) return false;
 
-    metadata->state = DZ_BLOCK_STATE_ACTIVE;
+    metadata->state = DZ_BLOCK_STATE_UNKNOWN;
 
-    memset(metadata->pageStateMap, DZ_PAGE_STATE_VALID, metadata->pageCount);
+    memset(metadata->pageStateMap, DZ_PAGE_STATE_UNKNOWN, metadata->pageCount);
 
     return true;
 }

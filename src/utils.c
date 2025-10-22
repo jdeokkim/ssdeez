@@ -87,9 +87,20 @@ dzF64 dzUtilsGaussian(dzF64 mu, dzF64 sigma) {
     }
 }
 
-/* Returns a pseudo-random number in the given range. */
-dzF64 dzUtilsRandRange(dzF64 min, dzF64 max) {
+/* 
+    Returns a pseudo-random double-precision floating-point number 
+    in the given (exclusive) range. 
+*/
+dzF64 dzUtilsRandRangeF64(dzF64 min, dzF64 max) {
     return min + ((max - min) * dzUtilsUniform_());
+}
+
+/* 
+    Returns a pseudo-random unsigned 64-bit integer 
+    in the given (inclusive) range. 
+*/
+dzU64 dzUtilsRandRangeU64(dzU64 min, dzU64 max) {
+    return min + (dzU64) ((dzF64) (max - min + 1) * dzUtilsUniform_());
 }
 
 /* Returns a pseudo-random number from an uniform distribution. */
