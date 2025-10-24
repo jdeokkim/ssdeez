@@ -64,10 +64,7 @@ extern "C" {
 /* Specifies the standard deviation ratio for the erase latency. */
 #define DZ_BLOCK_ERASE_LATENCY_STDDEV_RATIO    0.05
 
-/* Specifies the minimum ratio for factory bad blocks in a die. */
-#define DZ_BLOCK_FACTORY_BAD_BLOCK_MIN_RATIO   0.001
-
-/* Specifies the maximum ratio for factory bad blocks in a die. */
+/* Specifies the maximum ratio of factory bad blocks in a die. */
 #define DZ_BLOCK_FACTORY_BAD_BLOCK_MAX_RATIO   0.01
 
 /*
@@ -304,9 +301,6 @@ dzU64 dzDieGetBlockCount(const dzDie *die);
 /* Returns the current state of the block corresponding to `pba` in `die`. */
 dzBlockState dzDieGetBlockState(const dzDie *die, dzPBA pba);
 
-/* Returns the total number of pages in `die`. */
-dzU64 dzDieGetPageCount(const dzDie *die);
-
 /* Returns the first physical block address within `die`. */
 dzPBA dzDieGetFirstPBA(const dzDie *die);
 
@@ -318,6 +312,9 @@ dzPBA dzDieGetNextPBA(const dzDie *die, dzPBA pba);
 
 /* Returns the next physical page address following `ppa` within `die`. */
 dzPPA dzDieGetNextPPA(const dzDie *die, dzPPA ppa);
+
+/* Returns the total number of pages in `die`. */
+dzU64 dzDieGetPageCount(const dzDie *die);
 
 /* 
     Returns the current state of the page 
@@ -386,20 +383,20 @@ dzUSize dzPlaneGetMetadataSize(void);
 /* Returns a pseudo-random number from a Gaussian distribution. */
 dzF64 dzUtilsGaussian(dzF64 mu, dzF64 sigma);
 
-/* 
-    Returns a pseudo-random double-precision floating-point number 
-    in the given (exclusive) range. 
-*/
-dzF64 dzUtilsRandRangeF64(dzF64 min, dzF64 max);
+/* Returns a pseudo-random unsigned 64-bit integer. */
+dzU64 dzUtilsRand(void);
 
 /* 
     Returns a pseudo-random unsigned 64-bit integer 
     in the given (inclusive) range. 
 */
-dzU64 dzUtilsRandRangeU64(dzU64 min, dzU64 max);
+dzU64 dzUtilsRandRange(dzU64 min, dzU64 max);
 
-/* Returns a pseudo-random number from an uniform distribution. */
-dzF64 dzUtilsUniform(void);
+/* 
+    Returns a pseudo-random double-precision floating-point number 
+    in the given (exclusive) range. 
+*/
+dzF64 dzUtilsRandRangeF64(dzF64 min, dzF64 max);
 
 /* ========================================================================> */
 

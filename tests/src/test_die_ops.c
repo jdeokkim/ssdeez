@@ -96,6 +96,8 @@ TEST dzTestPageOps(void) {
 
     for (dzPPA ppa = dzDieGetFirstPPA(die); ppa.pageId != DZ_PAGE_INVALID_ID;
          ppa = dzDieGetNextPPA(die, ppa)) {
+        // if (dzDieGetPageState(die, ppa) == DZ_PAGE_STATE_BAD) continue;
+
         ASSERT_EQ(true, dzDieProgramPage(die, ppa, srcBuffer));
 
         // NOTE: This page is already programmed!
@@ -146,6 +148,8 @@ TEST dzTestBlockOps(void) {
 
     for (dzPPA pba = dzDieGetFirstPBA(die); pba.blockId != DZ_PAGE_INVALID_ID;
          pba = dzDieGetNextPBA(die, pba)) {
+        // if (dzDieGetBlockState(die, pba) == DZ_BLOCK_STATE_BAD) continue;
+
         ASSERT_EQ(DZ_BLOCK_STATE_ACTIVE, dzDieGetBlockState(die, pba));
 
         ASSERT_EQ(true, dzDieEraseBlock(die, pba));

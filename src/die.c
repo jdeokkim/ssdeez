@@ -39,16 +39,18 @@
          ptrIdentifier < ptrIdentifier##__LINE__;               \
          ptrIdentifier += (dieMetadata).physicalPageSize)
 
-#define dzDieForEachPageInBlock(dieBuffer,                                    \
-                                dieMetadata,                                  \
-                                blockId,                                      \
-                                ptrIdentifier)                                \
-    for (dzByte *ptrIdentifier =                                              \
-             (dieBuffer) + ((blockId) * ((dieMetadata).physicalBlockSize)),   \
-                *ptrIdentifier##__LINE__ =                                    \
-                    (dieBuffer)                                               \
-                    + (((blockId) + 1U) * ((dieMetadata).physicalBlockSize)); \
-         ptrIdentifier < ptrIdentifier##__LINE__;                             \
+#define dzDieForEachPageInBlock(dieBuffer,                         \
+                                dieMetadata,                       \
+                                blockIndex,                        \
+                                ptrIdentifier)                     \
+    for (dzByte *ptrIdentifier =                                   \
+             (dieBuffer)                                           \
+             + ((blockIndex) * ((dieMetadata).physicalBlockSize)), \
+                *ptrIdentifier##__LINE__ =                         \
+                    (dieBuffer)                                    \
+                    + (((blockIndex) + 1U)                         \
+                       * ((dieMetadata).physicalBlockSize));       \
+         ptrIdentifier < ptrIdentifier##__LINE__;                  \
          ptrIdentifier += (dieMetadata).physicalPageSize)
 
 /* Typedefs ===============================================================> */
@@ -94,6 +96,9 @@ const dzU64 DZ_DIE_INVALID_ID = UINT64_MAX;
 // TODO: ...
 
 /* Private Function Prototypes ============================================> */
+
+/* Mark a random number of blocks as bad. */
+static bool dzDieCorruptRandomBlocks(dzDie *die);
 
 /* Creates a die buffer with the given `config` and `metadata`. */
 static dzByte *dzDieCreateBuffer(dzDieConfig config, dzDieMetadata metadata);
@@ -157,7 +162,8 @@ dzDie *dzDieCreate(dzDieConfig config) {
     }
 
     if (!dzDieInitMetadata(die)
-        || (die->buffer = dzDieCreateBuffer(config, die->metadata)) == NULL) {
+        || (die->buffer = dzDieCreateBuffer(config, die->metadata)) == NULL
+        || !dzDieCorruptRandomBlocks(die)) {
         dzDieRelease(die);
 
         return NULL;
@@ -206,11 +212,6 @@ dzBlockState dzDieGetBlockState(const dzDie *die, dzPBA pba) {
                                    + (blockIndex * dzBlockGetMetadataSize()));
 
     return dzBlockGetState(blockMetadata);
-}
-
-/* Returns the total number of pages in `die`. */
-dzU64 dzDieGetPageCount(const dzDie *die) {
-    return (die != NULL) ? die->metadata.pageCountPerDie : 0U;
 }
 
 /* Returns the first physical block address within `die`. */
@@ -291,6 +292,11 @@ dzPPA dzDieGetNextPPA(const dzDie *die, dzPPA ppa) {
                             .planeId = DZ_PLANE_INVALID_ID,
                             .blockId = DZ_BLOCK_INVALID_ID,
                             .pageId = DZ_PAGE_INVALID_ID });
+}
+
+/* Returns the total number of pages in `die`. */
+dzU64 dzDieGetPageCount(const dzDie *die) {
+    return (die != NULL) ? die->metadata.pageCountPerDie : 0U;
 }
 
 /* 
@@ -449,6 +455,85 @@ bool dzDieEraseBlock(dzDie *die, dzPBA pba) {
 
 /* Private Functions ======================================================> */
 
+/* Mark a random number of blocks as bad. */
+static bool dzDieCorruptRandomBlocks(dzDie *die) {
+    if (die == NULL || die->metadata.blockCountPerDie <= 1) return false;
+
+    dzU64 blockCountPerDie = die->metadata.blockCountPerDie;
+
+    dzF64 factoryBadBlockRatio =
+        dzUtilsRandRangeF64(0.001, DZ_BLOCK_FACTORY_BAD_BLOCK_MAX_RATIO);
+
+    dzU64 factoryBadBlockCount = (dzU64) ceil(factoryBadBlockRatio
+                                              * (dzF64) blockCountPerDie);
+
+    if (factoryBadBlockCount == 0U) factoryBadBlockCount++;
+
+    // NOTE: Block #0 is always guaranteed to be a 'good' block
+    dzU64 blockIndex = dzUtilsRandRange(1U, blockCountPerDie - 1);
+
+    while (factoryBadBlockCount > 0) {
+        dzBlockMetadata *blockMetadata =
+            (dzBlockMetadata *) (((dzByte *) die->metadata.blocks)
+                                 + (blockIndex * dzBlockGetMetadataSize()));
+
+        if (dzBlockGetState(blockMetadata) == DZ_BLOCK_STATE_BAD) continue;
+
+        // clang-format off
+
+        dzDieForEachPageInBlock(die->buffer, die->metadata, blockIndex, pagePtr) {
+            ((void) dzPageMarkAsUnknown(pagePtr, die->config.pageSizeInBytes));
+            ((void) dzPageMarkAsBad(pagePtr, die->config.pageSizeInBytes));
+        }
+
+        // clang-format on
+
+        (void) dzBlockMarkAsUnknown(blockMetadata);
+        (void) dzBlockMarkAsBad(blockMetadata);
+
+        dzU64 prevBlockIndex = (blockIndex > 1U) ? (blockIndex - 1U)
+                                                 : DZ_BLOCK_INVALID_ID;
+
+        if (prevBlockIndex != DZ_BLOCK_INVALID_ID) {
+            dzBlockMetadata *prevBlockMetadata =
+                (dzBlockMetadata *) (((dzByte *) die->metadata.blocks)
+                                     + (prevBlockIndex
+                                        * dzBlockGetMetadataSize()));
+
+            if (dzBlockGetState(prevBlockMetadata) == DZ_BLOCK_STATE_BAD)
+                prevBlockIndex = DZ_BLOCK_INVALID_ID;
+        }
+
+        dzU64 nextBlockIndex = (blockIndex < blockCountPerDie - 1U)
+                                   ? (blockIndex + 1U)
+                                   : DZ_BLOCK_INVALID_ID;
+
+        if (nextBlockIndex != DZ_BLOCK_INVALID_ID) {
+            dzBlockMetadata *nextBlockMetadata =
+                (dzBlockMetadata *) (((dzByte *) die->metadata.blocks)
+                                     + (nextBlockIndex
+                                        * dzBlockGetMetadataSize()));
+
+            if (dzBlockGetState(nextBlockMetadata) == DZ_BLOCK_STATE_BAD)
+                nextBlockIndex = DZ_BLOCK_INVALID_ID;
+        }
+
+        dzU64 newBlockIndex = (prevBlockIndex != DZ_BLOCK_INVALID_ID)
+                                  ? prevBlockIndex
+                                  : nextBlockIndex;
+
+        // NOTE: Corruption may or may not spread within an one-block radius
+        if ((dzUtilsRand() & 1U) || newBlockIndex == DZ_BLOCK_INVALID_ID)
+            blockIndex = dzUtilsRandRange(1U, blockCountPerDie - 1);
+        else
+            blockIndex = newBlockIndex;
+
+        factoryBadBlockCount--;
+    }
+
+    return true;
+}
+
 /* Creates a die buffer with the given `config` and `metadata`. */
 static dzByte *dzDieCreateBuffer(dzDieConfig config, dzDieMetadata metadata) {
     dzByte *result = NULL;
@@ -510,9 +595,7 @@ static bool dzDieInitBlockMetadata(dzDie *die) {
 
     dzPBA pba = dzDieGetFirstPBA(die);
 
-    dzU64 blockCountPerDie = die->metadata.blockCountPerDie;
-
-    for (dzU64 i = 0U; i < blockCountPerDie; i++) {
+    for (dzU64 i = 0U; i < die->metadata.blockCountPerDie; i++) {
         dzBlockMetadata *blockMetadata =
             (dzBlockMetadata *) (((dzByte *) die->metadata.blocks)
                                  + (i * dzBlockGetMetadataSize()));
@@ -526,29 +609,6 @@ static bool dzDieInitBlockMetadata(dzDie *die) {
         if (!dzBlockInitMetadata(blockMetadata, blockConfig)) return false;
 
         pba = dzDieGetNextPBA(die, pba);
-    }
-
-    dzF64 factoryBadBlockRatio =
-        dzUtilsRandRangeF64(DZ_BLOCK_FACTORY_BAD_BLOCK_MIN_RATIO,
-                            DZ_BLOCK_FACTORY_BAD_BLOCK_MAX_RATIO);
-
-    dzU64 factoryBadBlockCount = (dzU64) ceil(factoryBadBlockRatio
-                                              * (dzF64) blockCountPerDie);
-
-    if (factoryBadBlockCount == 0) factoryBadBlockCount++;
-
-    while (factoryBadBlockCount > 0) {
-        dzU64 badBlockIndex = dzUtilsRandRangeU64(0U, blockCountPerDie - 1);
-
-        dzBlockMetadata *blockMetadata =
-            (dzBlockMetadata *) (((dzByte *) die->metadata.blocks)
-                                 + (badBlockIndex * dzBlockGetMetadataSize()));
-
-        DZ_API_UNUSED_VARIABLE(blockMetadata);
-
-        // TODO: ...
-
-        factoryBadBlockCount--;
     }
 
     return true;

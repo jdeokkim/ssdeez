@@ -50,7 +50,7 @@ static dzU64 prngStates[4] = { 0x2025, 0x0926, 0x2116, 0x1200 };
 DZ_API_PRIVATE_INLINE dzU64 dzUtilsXoshiroPlus(void);
 
 /* Returns a pseudo-random number from an uniform distribution. */
-DZ_API_PRIVATE_INLINE dzF64 dzUtilsUniform_(void);
+DZ_API_PRIVATE_INLINE dzF64 dzUtilsUniform(void);
 
 /* Public Functions =======================================================> */
 
@@ -73,8 +73,8 @@ dzF64 dzUtilsGaussian(dzF64 mu, dzF64 sigma) {
         dzF64 x, y, r;
 
         do {
-            x = (2.0 * dzUtilsUniform_()) - 1.0;
-            y = (2.0 * dzUtilsUniform_()) - 1.0;
+            x = (2.0 * dzUtilsUniform()) - 1.0;
+            y = (2.0 * dzUtilsUniform()) - 1.0;
 
             r = x * x + y * y;
         } while (r >= 1.0 || r == 0.0);
@@ -87,25 +87,28 @@ dzF64 dzUtilsGaussian(dzF64 mu, dzF64 sigma) {
     }
 }
 
-/* 
-    Returns a pseudo-random double-precision floating-point number 
-    in the given (exclusive) range. 
-*/
-dzF64 dzUtilsRandRangeF64(dzF64 min, dzF64 max) {
-    return min + ((max - min) * dzUtilsUniform_());
+/* Returns a pseudo-random unsigned 64-bit integer. */
+dzU64 dzUtilsRand(void) {
+    return dzUtilsXoshiroPlus();
 }
 
 /* 
     Returns a pseudo-random unsigned 64-bit integer 
     in the given (inclusive) range. 
 */
-dzU64 dzUtilsRandRangeU64(dzU64 min, dzU64 max) {
-    return min + (dzU64) ((dzF64) (max - min + 1) * dzUtilsUniform_());
+dzU64 dzUtilsRandRange(dzU64 min, dzU64 max) {
+    return (min < max)
+               ? (min + (dzU64) ((dzF64) (max - min + 1) * dzUtilsUniform()))
+               : (max + (dzU64) ((dzF64) (min - max + 1) * dzUtilsUniform()));
 }
 
-/* Returns a pseudo-random number from an uniform distribution. */
-dzF64 dzUtilsUniform(void) {
-    return dzUtilsUniform_();
+/* 
+    Returns a pseudo-random double-precision floating-point number 
+    in the given (exclusive) range. 
+*/
+dzF64 dzUtilsRandRangeF64(dzF64 min, dzF64 max) {
+    return (min < max) ? (min + ((max - min) * dzUtilsUniform()))
+                       : (max + ((min - max) * dzUtilsUniform()));
 }
 
 /* Private Functions ======================================================> */
@@ -138,7 +141,7 @@ DZ_API_PRIVATE_INLINE dzU64 dzUtilsXoshiroPlus(void) {
 }
 
 /* Returns a pseudo-random number from an uniform distribution. */
-DZ_API_PRIVATE_INLINE dzF64 dzUtilsUniform_(void) {
+DZ_API_PRIVATE_INLINE dzF64 dzUtilsUniform(void) {
     // NOTE: Extract the upper 53 bits, then multiply by 2^(-53)
     return 1.11022302462515654e-16 * ((dzF64) (dzUtilsXoshiroPlus() >> 11));
 }
