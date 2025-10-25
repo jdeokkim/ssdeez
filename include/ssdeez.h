@@ -260,6 +260,9 @@ dzUSize dzBlockGetMetadataSize(void);
 /* Writes the next page identifier of a block to `nextPageId`. */
 bool dzBlockGetNextPageId(dzBlockMetadata *metadata, dzU64 *nextPageId);
 
+/* Returns the physical block address of a block. */
+dzPBA dzBlockGetPBA(const dzBlockMetadata *metadata);
+
 /* Returns the current state of a block. */
 dzBlockState dzBlockGetState(const dzBlockMetadata *metadata);
 
@@ -405,7 +408,7 @@ dzF64 dzUtilsRandRangeF64(dzF64 min, dzF64 max);
 /* ========================================================================> */
 
 /* Returns `true` if `pba1` equals to `pba2`. */
-DZ_API_INLINE bool dzUtilsPbaEquals(dzPBA pba1, dzPBA pba2) {
+DZ_API_INLINE bool dzUtilsPBAEquals(dzPBA pba1, dzPBA pba2) {
     return (pba1.chipId == pba2.chipId) && (pba1.dieId == pba2.dieId)
            && (pba1.planeId == pba2.planeId) && (pba1.blockId == pba2.blockId);
 }

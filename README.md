@@ -46,7 +46,7 @@ I present SSDeez, a lightweight NAND flash-based SSD simulator written in C99, f
   - [x] Sequential Page Programming
 - Plane
   - [ ] Plane-Level Statistics
-    - [ ] Block State Bitmap
+    - [x] Block State Bitmap
     - [ ] Least Worn Block
 - Die
   - [x] Factory Bad Block Injection

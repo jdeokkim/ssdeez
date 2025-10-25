@@ -136,7 +136,8 @@ dzUSize dzPageGetMetadataSize(void) {
 /* Returns the physical page address of a page. */
 dzPPA dzPageGetPPA(const dzByte *pagePtr, dzU32 pageSizeInBytes) {
     if (pagePtr == NULL || pageSizeInBytes == 0U)
-        return (dzPPA) { .dieId = DZ_DIE_INVALID_ID,
+        return (dzPPA) { .chipId = DZ_CHIP_INVALID_ID,
+                         .dieId = DZ_DIE_INVALID_ID,
                          .planeId = DZ_PLANE_INVALID_ID,
                          .blockId = DZ_BLOCK_INVALID_ID,
                          .pageId = DZ_PAGE_INVALID_ID };

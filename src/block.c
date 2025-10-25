@@ -118,6 +118,18 @@ bool dzBlockGetNextPageId(dzBlockMetadata *metadata, dzU64 *nextPageId) {
     return true;
 }
 
+/* Returns the physical block address of a block. */
+dzPBA dzBlockGetPBA(const dzBlockMetadata *metadata) {
+    if (metadata == NULL)
+        return (dzPPA) { .chipId = DZ_CHIP_INVALID_ID,
+                         .dieId = DZ_DIE_INVALID_ID,
+                         .planeId = DZ_PLANE_INVALID_ID,
+                         .blockId = DZ_BLOCK_INVALID_ID,
+                         .pageId = DZ_PAGE_INVALID_ID };
+
+    return metadata->pba;
+}
+
 /* Returns the current state of a block. */
 dzBlockState dzBlockGetState(const dzBlockMetadata *metadata) {
     return (metadata != NULL) ? metadata->state : DZ_BLOCK_STATE_UNKNOWN;
@@ -211,7 +223,7 @@ bool dzBlockUpdatePageStateMap(dzBlockMetadata *metadata,
                                dzPageState pageState) {
     if (metadata == NULL || metadata->nextPageId == DZ_PAGE_INVALID_ID
         || metadata->pageStateMap == NULL
-        || !dzUtilsPbaEquals(metadata->pba, ppa)
+        || !dzUtilsPBAEquals(metadata->pba, ppa)
         || ppa.pageId != metadata->nextPageId)
         return false;
 

@@ -534,7 +534,19 @@ static bool dzDieCorruptRandomBlocks(dzDie *die) {
         (void) dzBlockMarkAsUnknown(blockMetadata);
         (void) dzBlockMarkAsBad(blockMetadata);
 
-        // TODO: ...
+        {
+            dzPBA pba = dzBlockGetPBA(blockMetadata);
+
+            dzPlaneMetadata *planeMetadata =
+                (dzPlaneMetadata *) (((dzByte *) die->metadata.planes)
+                                     + (pba.planeId
+                                        * dzPlaneGetMetadataSize()));
+
+            dzBlockState blockState = dzDieGetBlockState(die, pba);
+
+            if (!dzPlaneUpdateBlockStateMap(planeMetadata, pba, blockState))
+                return false;
+        }
 
         dzU64 newBlockIndex = dzDieGetAdjacentBlockIndex(die, blockIndex);
 
@@ -567,7 +579,7 @@ static dzByte *dzDieCreateBuffer(dzDieConfig config, dzDieMetadata metadata) {
         dzF64 peCycleCountPenalty = 1.0;
 
         // NOTE: Pages in the top and bottom layers should have lower endurance
-        if (metadata.pageCountPerDie >= 2) {
+        if (metadata.pageCountPerDie >= 2U) {
             dzU64 distanceFromCenter = (pageIndex > centerPageIndex)
                                            ? (pageIndex - centerPageIndex)
                                            : (centerPageIndex - pageIndex);
@@ -766,7 +778,7 @@ DZ_API_PRIVATE_INLINE dzBool dzDieIsValidPBA(const dzDie *die, dzPBA pba) {
 DZ_API_PRIVATE_INLINE dzBool dzDieIsValidPPA(const dzDie *die, dzPPA ppa) {
     // clang-format off
 
-    return (die != NULL 
+    return (die != NULL
             && ppa.dieId == die->config.dieId
             && ppa.planeId < die->config.planeCountPerDie
             && ppa.blockId < die->config.blockCountPerPlane
