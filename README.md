@@ -22,6 +22,7 @@ I present SSDeez, a lightweight NAND flash-based SSD simulator written in C99, f
 - Page
   - Data Area
     - [x] Program/Read Operations
+    - [ ] Read "Parameter Page" Operation
   - Out-Of-Band (OOB) Area
     - [ ] Error Correction Code (ECC)
     - [x] Layer-to-Layer Endurance Variation
@@ -41,7 +42,8 @@ I present SSDeez, a lightweight NAND flash-based SSD simulator written in C99, f
     - [ ] Last Erase Time
     - [x] Page State Bitmap
     - [x] Total Erase Count
-  - [x] Erase Operations
+  - [x] Erase Operation
+  - [ ] Lock/Unlock Block(s) Operation
   - [x] "Probablistic" Erase Latencies
   - [x] Sequential Page Programming
 - Plane
@@ -51,8 +53,9 @@ I present SSDeez, a lightweight NAND flash-based SSD simulator written in C99, f
 - Die
   - [x] Factory Bad Block Injection
     - [x] "Spatial Correlation" Model
+  - [ ] One-Time Programmable (OTP) Area
 - Chip (Package)
-  - [ ] [ONFI 1.0 Simulation](https://onfi.org)
+  - [ ] [Open NAND Flash Interface (ONFI) 1.0](https://onfi.org)
 - Channel
 - SSD
 

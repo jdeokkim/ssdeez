@@ -82,6 +82,7 @@ struct dzDie_ {
     dzDieConfig config;
     dzDieStatistics stats;
     dzDieMetadata metadata;
+    // dzByte otpArea[2048];
     dzByte *buffer;
     // TODO: ...
 };
