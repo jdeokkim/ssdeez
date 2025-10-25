@@ -173,7 +173,7 @@ TEST dzTestBlockOps(void) {
              ppa.pageId != DZ_PAGE_INVALID_ID;
              ppa = dzDieGetNextPPA(die, ppa)) {
             // if (dzDieGetPageState(die, ppa) == DZ_PAGE_STATE_BAD) continue;
-    
+
             ASSERT_EQ(true, dzDieReadPage(die, ppa, dstBuffer));
 
             // NOTE: Check if all pages have been initialized to `0xFF`

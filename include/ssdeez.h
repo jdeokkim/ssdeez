@@ -281,8 +281,9 @@ bool dzBlockMarkAsFree(dzBlockMetadata *metadata, dzF64 *eraseLatency);
 /* Marks a block as unknown. */
 bool dzBlockMarkAsUnknown(dzBlockMetadata *metadata);
 
-/* Updates the state of the next page within a block's page state map. */
+/* Updates the state of the given page within a block's page state map. */
 bool dzBlockUpdatePageStateMap(dzBlockMetadata *metadata,
+                               dzPPA ppa,
                                dzPageState pageState);
 
 /* <------------------------------------------------------------ [src/die.c] */
@@ -376,6 +377,11 @@ void dzPlaneDeinitMetadata(dzPlaneMetadata *metadata);
 /* Returns the size of `dzPlaneMetadata`. */
 dzUSize dzPlaneGetMetadataSize(void);
 
+/* Updates the state of the given block within a plane's block state map. */
+bool dzPlaneUpdateBlockStateMap(dzPlaneMetadata *metadata,
+                                dzPBA pba,
+                                dzBlockState blockState);
+
 /* <---------------------------------------------------------- [src/utils.c] */
 
 /* Returns a pseudo-random number from a Gaussian distribution. */
@@ -395,6 +401,14 @@ dzU64 dzUtilsRandRange(dzU64 min, dzU64 max);
     in the given (exclusive) range. 
 */
 dzF64 dzUtilsRandRangeF64(dzF64 min, dzF64 max);
+
+/* ========================================================================> */
+
+/* Returns `true` if `pba1` equals to `pba2`. */
+DZ_API_INLINE bool dzUtilsPbaEquals(dzPBA pba1, dzPBA pba2) {
+    return (pba1.chipId == pba2.chipId) && (pba1.dieId == pba2.dieId)
+           && (pba1.planeId == pba2.planeId) && (pba1.blockId == pba2.blockId);
+}
 
 /* ========================================================================> */
 

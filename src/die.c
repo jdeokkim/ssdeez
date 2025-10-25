@@ -103,6 +103,12 @@ static bool dzDieCorruptRandomBlocks(dzDie *die);
 /* Creates a die buffer with the given `config` and `metadata`. */
 static dzByte *dzDieCreateBuffer(dzDieConfig config, dzDieMetadata metadata);
 
+/* 
+    Returns the previous or the next index of 
+    the given `blockIndex` in `die`. 
+*/
+static dzU64 dzDieGetAdjacentBlockIndex(dzDie *die, dzU64 blockIndex);
+
 /* Initializes all block metadata in `die.` */
 static bool dzDieInitBlockMetadata(dzDie *die);
 
@@ -349,14 +355,26 @@ bool dzDieProgramPage(dzDie *die, dzPPA ppa, dzSizedBuffer srcBuffer) {
     {
         dzPageState pageState = dzDieGetPageState(die, ppa);
 
-        if (!dzBlockUpdatePageStateMap(blockMetadata, pageState)) return false;
+        if (!dzBlockUpdatePageStateMap(blockMetadata, ppa, pageState))
+            return false;
 
         /*
             NOTE: Since at least one valid page is present in this block, 
-                  it can be marked as valid
+                  it can be marked as active
         */
         if (!dzBlockAdvanceNextPageId(blockMetadata)
             || !dzBlockMarkAsActive(blockMetadata))
+            return false;
+    }
+
+    dzPlaneMetadata *planeMetadata =
+        (dzPlaneMetadata *) (((dzByte *) die->metadata.planes)
+                             + (ppa.planeId * dzPlaneGetMetadataSize()));
+
+    {
+        dzBlockState blockState = dzDieGetBlockState(die, ppa);
+
+        if (!dzPlaneUpdateBlockStateMap(planeMetadata, ppa, blockState))
             return false;
     }
 
@@ -436,6 +454,18 @@ bool dzDieEraseBlock(dzDie *die, dzPBA pba) {
 
         (void) dzBlockMarkAsBad(blockMetadata);
 
+        {
+            dzPlaneMetadata *planeMetadata =
+                (dzPlaneMetadata *) (((dzByte *) die->metadata.planes)
+                                     + (pba.planeId
+                                        * dzPlaneGetMetadataSize()));
+
+            dzBlockState blockState = dzDieGetBlockState(die, pba);
+
+            if (!dzPlaneUpdateBlockStateMap(planeMetadata, pba, blockState))
+                return false;
+        }
+
         return result;
     }
 
@@ -448,6 +478,17 @@ bool dzDieEraseBlock(dzDie *die, dzPBA pba) {
 
         die->stats.totalEraseLatency += eraseLatency;
         die->stats.totalEraseCount++;
+    }
+
+    {
+        dzPlaneMetadata *planeMetadata =
+            (dzPlaneMetadata *) (((dzByte *) die->metadata.planes)
+                                 + (pba.planeId * dzPlaneGetMetadataSize()));
+
+        dzBlockState blockState = dzDieGetBlockState(die, pba);
+
+        if (!dzPlaneUpdateBlockStateMap(planeMetadata, pba, blockState))
+            return false;
     }
 
     return result;
@@ -463,11 +504,11 @@ static bool dzDieCorruptRandomBlocks(dzDie *die) {
 
     if (die->config.badBlockRatio <= 0.0) return true;
 
-    dzF64 badBlockRatio =
-        dzUtilsRandRangeF64(0.001, die->config.badBlockRatio);
+    dzF64 badBlockRatio = dzUtilsRandRangeF64(0.001,
+                                              die->config.badBlockRatio);
 
     dzU64 badBlockCount = (dzU64) ceil(badBlockRatio
-                                              * (dzF64) blockCountPerDie);
+                                       * (dzF64) blockCountPerDie);
 
     if (badBlockCount == 0U) badBlockCount++;
 
@@ -493,36 +534,9 @@ static bool dzDieCorruptRandomBlocks(dzDie *die) {
         (void) dzBlockMarkAsUnknown(blockMetadata);
         (void) dzBlockMarkAsBad(blockMetadata);
 
-        dzU64 prevBlockIndex = (blockIndex > 1U) ? (blockIndex - 1U)
-                                                 : DZ_BLOCK_INVALID_ID;
+        // TODO: ...
 
-        if (prevBlockIndex != DZ_BLOCK_INVALID_ID) {
-            dzBlockMetadata *prevBlockMetadata =
-                (dzBlockMetadata *) (((dzByte *) die->metadata.blocks)
-                                     + (prevBlockIndex
-                                        * dzBlockGetMetadataSize()));
-
-            if (dzBlockGetState(prevBlockMetadata) == DZ_BLOCK_STATE_BAD)
-                prevBlockIndex = DZ_BLOCK_INVALID_ID;
-        }
-
-        dzU64 nextBlockIndex = (blockIndex < blockCountPerDie - 1U)
-                                   ? (blockIndex + 1U)
-                                   : DZ_BLOCK_INVALID_ID;
-
-        if (nextBlockIndex != DZ_BLOCK_INVALID_ID) {
-            dzBlockMetadata *nextBlockMetadata =
-                (dzBlockMetadata *) (((dzByte *) die->metadata.blocks)
-                                     + (nextBlockIndex
-                                        * dzBlockGetMetadataSize()));
-
-            if (dzBlockGetState(nextBlockMetadata) == DZ_BLOCK_STATE_BAD)
-                nextBlockIndex = DZ_BLOCK_INVALID_ID;
-        }
-
-        dzU64 newBlockIndex = (prevBlockIndex != DZ_BLOCK_INVALID_ID)
-                                  ? prevBlockIndex
-                                  : nextBlockIndex;
+        dzU64 newBlockIndex = dzDieGetAdjacentBlockIndex(die, blockIndex);
 
         // NOTE: Corruption may or may not spread within an one-block radius
         if ((dzUtilsRand() & 1U) || newBlockIndex == DZ_BLOCK_INVALID_ID)
@@ -547,7 +561,7 @@ static dzByte *dzDieCreateBuffer(dzDieConfig config, dzDieMetadata metadata) {
     // NOTE: Simulating the 'erased' state by setting all bits to `1`
     (void) memset(result, 0xFF, config.pageSizeInBytes);
 
-    dzU64 pageIndex = 0U, centerPageIndex = metadata.pageCountPerDie >> 1;
+    dzU64 pageIndex = 0U, centerPageIndex = metadata.pageCountPerDie >> 1U;
 
     dzDieForEachPage(result, metadata, pagePtr) {
         dzF64 peCycleCountPenalty = 1.0;
@@ -589,6 +603,53 @@ static dzByte *dzDieCreateBuffer(dzDieConfig config, dzDieMetadata metadata) {
     }
 
     return result;
+}
+
+/* 
+    Returns the previous or the next index of 
+    the given `blockIndex` in `die`. 
+*/
+static dzU64 dzDieGetAdjacentBlockIndex(dzDie *die, dzU64 blockIndex) {
+    if (die == NULL || blockIndex == DZ_BLOCK_INVALID_ID)
+        return DZ_BLOCK_INVALID_ID;
+
+    dzU64 prevBlockIndex = (blockIndex > 1U) ? (blockIndex - 1U)
+                                             : DZ_BLOCK_INVALID_ID;
+
+    if (prevBlockIndex != DZ_BLOCK_INVALID_ID) {
+        dzBlockMetadata *prevBlockMetadata =
+            (dzBlockMetadata *) (((dzByte *) die->metadata.blocks)
+                                 + (prevBlockIndex
+                                    * dzBlockGetMetadataSize()));
+
+        if (dzBlockGetState(prevBlockMetadata) == DZ_BLOCK_STATE_BAD)
+            prevBlockIndex = DZ_BLOCK_INVALID_ID;
+    }
+
+    dzU64 nextBlockIndex = (blockIndex < (die->metadata.blockCountPerDie - 1U))
+                               ? (blockIndex + 1U)
+                               : DZ_BLOCK_INVALID_ID;
+
+    if (nextBlockIndex != DZ_BLOCK_INVALID_ID) {
+        dzBlockMetadata *nextBlockMetadata =
+            (dzBlockMetadata *) (((dzByte *) die->metadata.blocks)
+                                 + (nextBlockIndex
+                                    * dzBlockGetMetadataSize()));
+
+        if (dzBlockGetState(nextBlockMetadata) == DZ_BLOCK_STATE_BAD)
+            nextBlockIndex = DZ_BLOCK_INVALID_ID;
+    }
+
+    // clang-format off
+
+    if (prevBlockIndex == DZ_BLOCK_INVALID_ID) 
+        return nextBlockIndex;
+    else if (nextBlockIndex == DZ_BLOCK_INVALID_ID)
+        return prevBlockIndex;
+    else
+        return ((dzUtilsRand() & 1U) ? prevBlockIndex : nextBlockIndex);
+
+    // clang-format on
 }
 
 /* Initializes all block metadata in `die.` */

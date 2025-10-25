@@ -164,9 +164,8 @@ bool dzBlockMarkAsBad(dzBlockMetadata *metadata) {
     if (metadata == NULL || metadata->state == DZ_BLOCK_STATE_FREE)
         return false;
 
-    metadata->state = DZ_BLOCK_STATE_BAD;
-
     metadata->nextPageId = DZ_PAGE_INVALID_ID;
+    metadata->state = DZ_BLOCK_STATE_BAD;
 
     memset(metadata->pageStateMap, DZ_PAGE_STATE_BAD, metadata->pageCount);
 
@@ -180,11 +179,12 @@ bool dzBlockMarkAsFree(dzBlockMetadata *metadata, dzF64 *eraseLatency) {
         || metadata->state == DZ_BLOCK_STATE_FREE)
         return false;
 
+    metadata->nextPageId = 0U;
     metadata->state = DZ_BLOCK_STATE_FREE;
 
-    memset(metadata->pageStateMap, DZ_PAGE_STATE_FREE, metadata->pageCount);
-
     metadata->totalEraseCount++;
+
+    memset(metadata->pageStateMap, DZ_PAGE_STATE_FREE, metadata->pageCount);
 
     *eraseLatency =
         dzUtilsGaussian(eraseLatencyTable[metadata->cellType],
@@ -205,11 +205,14 @@ bool dzBlockMarkAsUnknown(dzBlockMetadata *metadata) {
     return true;
 }
 
-/* Updates the state of the next page within a block's page state map. */
+/* Updates the state of the given page within a block's page state map. */
 bool dzBlockUpdatePageStateMap(dzBlockMetadata *metadata,
+                               dzPPA ppa,
                                dzPageState pageState) {
     if (metadata == NULL || metadata->nextPageId == DZ_PAGE_INVALID_ID
-        || metadata->pageStateMap == NULL)
+        || metadata->pageStateMap == NULL
+        || !dzUtilsPbaEquals(metadata->pba, ppa)
+        || ppa.pageId != metadata->nextPageId)
         return false;
 
     metadata->pageStateMap[metadata->nextPageId] = pageState;

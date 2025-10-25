@@ -87,3 +87,17 @@ void dzPlaneDeinitMetadata(dzPlaneMetadata *metadata) {
 dzUSize dzPlaneGetMetadataSize(void) {
     return sizeof(dzPlaneMetadata);
 }
+
+/* Updates the state of the given block within a plane's block state map. */
+bool dzPlaneUpdateBlockStateMap(dzPlaneMetadata *metadata,
+                                dzPBA pba,
+                                dzBlockState blockState) {
+    if (metadata == NULL || metadata->blockStateMap == NULL
+        || pba.planeId != metadata->planeId
+        || pba.blockId == DZ_BLOCK_INVALID_ID)
+        return false;
+
+    metadata->blockStateMap[pba.blockId] = blockState;
+
+    return true;
+}
