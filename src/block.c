@@ -206,6 +206,17 @@ bool dzBlockMarkAsFree(dzBlockMetadata *metadata, dzF64 *eraseLatency) {
     return true;
 }
 
+/* Marks a block as reserved. */
+bool dzBlockMarkAsReserved(dzBlockMetadata *metadata) {
+    if (metadata == NULL) return false;
+
+    metadata->state = DZ_BLOCK_STATE_RESERVED;
+
+    // TODO: ...
+
+    return true;
+}
+
 /* Marks a block as unknown. */
 bool dzBlockMarkAsUnknown(dzBlockMetadata *metadata) {
     if (metadata == NULL) return false;

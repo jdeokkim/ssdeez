@@ -49,7 +49,7 @@ SSDEEZ_INCLUDE_PATH = ../include
 SSDEEZ_LIBRARY_PATH = ../lib
 
 OBJECTS = \
-	${SOURCE_PATH}/test_die_ops.o  \
+	${SOURCE_PATH}/test_die.o  \
 	${SOURCE_PATH}/test_utils.o    \
 	${SOURCE_PATH}/main.o
 

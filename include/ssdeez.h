@@ -116,7 +116,7 @@ typedef double        dzF64;
 typedef enum dzBlockState_ {
     DZ_BLOCK_STATE_UNKNOWN = -1,
     DZ_BLOCK_STATE_FREE,
-    DZ_BLOCK_STATE_VICTIM,
+    // DZ_BLOCK_STATE_VICTIM,
     DZ_BLOCK_STATE_ACTIVE,
     DZ_BLOCK_STATE_BAD,
     DZ_BLOCK_STATE_RESERVED,
@@ -127,10 +127,9 @@ typedef enum dzBlockState_ {
 typedef enum dzPageState_ {
     DZ_PAGE_STATE_UNKNOWN = -1,
     DZ_PAGE_STATE_FREE,
-    DZ_PAGE_STATE_INVALID,
+    // DZ_PAGE_STATE_INVALID,
     DZ_PAGE_STATE_VALID,
     DZ_PAGE_STATE_BAD,
-    DZ_PAGE_STATE_RESERVED,
     DZ_PAGE_STATE_COUNT_
 } dzPageState;
 
@@ -281,6 +280,9 @@ bool dzBlockMarkAsBad(dzBlockMetadata *metadata);
 /* Marks a block as free. */
 bool dzBlockMarkAsFree(dzBlockMetadata *metadata, dzF64 *eraseLatency);
 
+/* Marks a block as reserved. */
+bool dzBlockMarkAsReserved(dzBlockMetadata *metadata);
+
 /* Marks a block as unknown. */
 bool dzBlockMarkAsUnknown(dzBlockMetadata *metadata);
 
@@ -360,6 +362,9 @@ bool dzPageMarkAsBad(dzByte *pagePtr, dzU32 pageSizeInBytes);
 
 /* Marks a page as free. */
 bool dzPageMarkAsFree(dzByte *pagePtr, dzU32 pageSizeInBytes);
+
+/* Marks a page as reserved. */
+bool dzPageMarkAsReserved(dzByte *pagePtr, dzU32 pageSizeInBytes);
 
 /* Marks a page as unknown. */
 bool dzPageMarkAsUnknown(dzByte *pagePtr, dzU32 pageSizeInBytes);

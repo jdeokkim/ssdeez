@@ -34,7 +34,7 @@
 // NOTE: Based on the specs provided in the Samsung K9F2G08U0M datasheet
 static const dzDieConfig dieConfig = { .dieId = 0U,
                                        .cellType = DZ_CELL_TYPE_SLC,
-                                       .badBlockRatio = 0.0,
+                                       .badBlockRatio = 0.01,
                                        .planeCountPerDie = 1U,
                                        .blockCountPerPlane = 2048U,
                                        .pageCountPerBlock = 64U,
@@ -51,6 +51,7 @@ static void dzTestTeardownCb(void *ctx);
 
 TEST dzTestPageOps(void);
 TEST dzTestBlockOps(void);
+TEST dzTestDieStats(void);
 
 /* Public Functions =======================================================> */
 
@@ -60,6 +61,7 @@ SUITE(dzTestDieOps) {
 
     RUN_TEST(dzTestPageOps);
     RUN_TEST(dzTestBlockOps);
+    RUN_TEST(dzTestDieStats);
 }
 
 /* Private Functions ======================================================> */
@@ -97,7 +99,7 @@ TEST dzTestPageOps(void) {
 
     for (dzPPA ppa = dzDieGetFirstPPA(die); ppa.pageId != DZ_PAGE_INVALID_ID;
          ppa = dzDieGetNextPPA(die, ppa)) {
-        // if (dzDieGetPageState(die, ppa) == DZ_PAGE_STATE_BAD) continue;
+        if (dzDieGetPageState(die, ppa) == DZ_PAGE_STATE_BAD) continue;
 
         ASSERT_EQ(true, dzDieProgramPage(die, ppa, srcBuffer));
 
@@ -112,7 +114,7 @@ TEST dzTestPageOps(void) {
 
     for (dzPPA ppa = dzDieGetFirstPPA(die); ppa.pageId != DZ_PAGE_INVALID_ID;
          ppa = dzDieGetNextPPA(die, ppa)) {
-        // if (dzDieGetPageState(die, ppa) == DZ_PAGE_STATE_BAD) continue;
+        if (dzDieGetPageState(die, ppa) == DZ_PAGE_STATE_BAD) continue;
 
         // NOTE: Making sure `dzDieReadPage()` is doing its job well
         memset(dstBuffer.ptr, 0xFF, dstBuffer.size);
@@ -151,7 +153,7 @@ TEST dzTestBlockOps(void) {
 
     for (dzPPA pba = dzDieGetFirstPBA(die); pba.blockId != DZ_PAGE_INVALID_ID;
          pba = dzDieGetNextPBA(die, pba)) {
-        // if (dzDieGetBlockState(die, pba) == DZ_BLOCK_STATE_BAD) continue;
+        if (dzDieGetBlockState(die, pba) == DZ_BLOCK_STATE_BAD) continue;
 
         ASSERT_EQ(DZ_BLOCK_STATE_ACTIVE, dzDieGetBlockState(die, pba));
 
@@ -172,7 +174,7 @@ TEST dzTestBlockOps(void) {
         for (dzPPA ppa = dzDieGetFirstPPA(die);
              ppa.pageId != DZ_PAGE_INVALID_ID;
              ppa = dzDieGetNextPPA(die, ppa)) {
-            // if (dzDieGetPageState(die, ppa) == DZ_PAGE_STATE_BAD) continue;
+            if (dzDieGetPageState(die, ppa) == DZ_PAGE_STATE_BAD) continue;
 
             ASSERT_EQ(true, dzDieReadPage(die, ppa, dstBuffer));
 
@@ -181,6 +183,12 @@ TEST dzTestBlockOps(void) {
                 ASSERT_EQ((dzByte) 0xFF, dstBuffer.ptr[k]);
         }
     }
+
+    PASS();
+}
+
+TEST dzTestDieStats(void) {
+    // TODO: ...
 
     PASS();
 }

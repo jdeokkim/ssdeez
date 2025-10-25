@@ -34,7 +34,7 @@ I present SSDeez, a lightweight NAND flash-based SSD simulator written in C99, f
     - [x] Physical Page Address
     - [x] "Probablistic" P/E Cycle Counts
     - [x] "Probablistic" Program/Read Latencies
-    - [ ] Read Disturbance 
+    - [ ] Read Disturbance
 - Block
   - [x] Block States (Free, Active, Bad, etc.)
   - [ ] Block-Level Statistics
@@ -52,6 +52,7 @@ I present SSDeez, a lightweight NAND flash-based SSD simulator written in C99, f
   - [x] Factory Bad Block Injection
     - [x] "Spatial Correlation" Model
 - Chip (Package)
+  - [ ] [ONFI 1.0 Simulation](https://onfi.org)
 - Channel
 - SSD
 

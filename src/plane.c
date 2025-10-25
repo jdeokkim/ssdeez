@@ -33,6 +33,7 @@
 /* A structure that represents the metadata of a NAND flash plane. */
 struct dzPlaneMetadata_ {
     dzByte *blockStateMap;
+    dzU64 leastWornBlockId;
     dzU64 blockCount;
     dzU64 planeId;
     // TODO: ...
@@ -66,8 +67,8 @@ bool dzPlaneInitMetadata(dzPlaneMetadata *metadata, dzPlaneConfig config) {
     }
 
     {
+        metadata->leastWornBlockId = config.blockCount - 1U;
         metadata->blockCount = config.blockCount;
-
         metadata->planeId = config.planeId;
 
         // TODO: ...
