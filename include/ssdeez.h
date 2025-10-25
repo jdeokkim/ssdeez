@@ -64,9 +64,6 @@ extern "C" {
 /* Specifies the standard deviation ratio for the erase latency. */
 #define DZ_BLOCK_ERASE_LATENCY_STDDEV_RATIO    0.05
 
-/* Specifies the maximum ratio of factory bad blocks in a die. */
-#define DZ_BLOCK_FACTORY_BAD_BLOCK_MAX_RATIO   0.01
-
 /*
     Specifies how much space the OOB (Out-Of-Band) area takes up,
     in relation to the total page size.
@@ -171,6 +168,7 @@ typedef struct dzDie_ dzDie;
 typedef struct dzDieConfig_ {
     dzU64 dieId;
     dzCellType cellType;
+    dzF64 badBlockRatio;
     dzU32 planeCountPerDie;
     dzU32 blockCountPerPlane;
     dzU32 pageCountPerBlock;

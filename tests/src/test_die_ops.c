@@ -34,6 +34,7 @@
 // NOTE: Based on the specs provided in the Samsung K9F2G08U0M datasheet
 static const dzDieConfig dieConfig = { .dieId = 0U,
                                        .cellType = DZ_CELL_TYPE_SLC,
+                                       .badBlockRatio = 0.0,
                                        .planeCountPerDie = 1U,
                                        .blockCountPerPlane = 2048U,
                                        .pageCountPerBlock = 64U,
@@ -111,6 +112,8 @@ TEST dzTestPageOps(void) {
 
     for (dzPPA ppa = dzDieGetFirstPPA(die); ppa.pageId != DZ_PAGE_INVALID_ID;
          ppa = dzDieGetNextPPA(die, ppa)) {
+        // if (dzDieGetPageState(die, ppa) == DZ_PAGE_STATE_BAD) continue;
+
         // NOTE: Making sure `dzDieReadPage()` is doing its job well
         memset(dstBuffer.ptr, 0xFF, dstBuffer.size);
 
@@ -169,6 +172,8 @@ TEST dzTestBlockOps(void) {
         for (dzPPA ppa = dzDieGetFirstPPA(die);
              ppa.pageId != DZ_PAGE_INVALID_ID;
              ppa = dzDieGetNextPPA(die, ppa)) {
+            // if (dzDieGetPageState(die, ppa) == DZ_PAGE_STATE_BAD) continue;
+    
             ASSERT_EQ(true, dzDieReadPage(die, ppa, dstBuffer));
 
             // NOTE: Check if all pages have been initialized to `0xFF`

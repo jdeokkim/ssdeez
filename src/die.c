@@ -461,18 +461,20 @@ static bool dzDieCorruptRandomBlocks(dzDie *die) {
 
     dzU64 blockCountPerDie = die->metadata.blockCountPerDie;
 
-    dzF64 factoryBadBlockRatio =
-        dzUtilsRandRangeF64(0.001, DZ_BLOCK_FACTORY_BAD_BLOCK_MAX_RATIO);
+    if (die->config.badBlockRatio <= 0.0) return true;
 
-    dzU64 factoryBadBlockCount = (dzU64) ceil(factoryBadBlockRatio
+    dzF64 badBlockRatio =
+        dzUtilsRandRangeF64(0.001, die->config.badBlockRatio);
+
+    dzU64 badBlockCount = (dzU64) ceil(badBlockRatio
                                               * (dzF64) blockCountPerDie);
 
-    if (factoryBadBlockCount == 0U) factoryBadBlockCount++;
+    if (badBlockCount == 0U) badBlockCount++;
 
     // NOTE: Block #0 is always guaranteed to be a 'good' block
     dzU64 blockIndex = dzUtilsRandRange(1U, blockCountPerDie - 1);
 
-    while (factoryBadBlockCount > 0) {
+    while (badBlockCount > 0) {
         dzBlockMetadata *blockMetadata =
             (dzBlockMetadata *) (((dzByte *) die->metadata.blocks)
                                  + (blockIndex * dzBlockGetMetadataSize()));
@@ -528,7 +530,7 @@ static bool dzDieCorruptRandomBlocks(dzDie *die) {
         else
             blockIndex = newBlockIndex;
 
-        factoryBadBlockCount--;
+        badBlockCount--;
     }
 
     return true;

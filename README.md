@@ -32,8 +32,8 @@ I present SSDeez, a lightweight NAND flash-based SSD simulator written in C99, f
       - [x] Total Program Count
       - [x] Total Read Count
     - [x] Physical Page Address
-    - [x] Randomized P/E Cycle Counts
-    - [x] Randomized Program/Read Latencies
+    - [x] "Probablistic" P/E Cycle Counts
+    - [x] "Probablistic" Program/Read Latencies
     - [ ] Read Disturbance 
 - Block
   - [x] Block States (Free, Active, Bad, etc.)
@@ -42,14 +42,15 @@ I present SSDeez, a lightweight NAND flash-based SSD simulator written in C99, f
     - [x] Page State Bitmap
     - [x] Total Erase Count
   - [x] Erase Operations
-  - [x] Randomized Erase Latencies
+  - [x] "Probablistic" Erase Latencies
   - [x] Sequential Page Programming
 - Plane
   - [ ] Plane-Level Statistics
     - [ ] Block State Bitmap
     - [ ] Least Worn Block
 - Die
-  - [ ] Factory Bad Blocks
+  - [x] Factory Bad Block Injection
+    - [x] "Spatial Correlation" Model
 - Chip (Package)
 - Channel
 - SSD
