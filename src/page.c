@@ -86,10 +86,10 @@ DZ_API_PRIVATE_INLINE bool dzIsValidCellType(dzCellType cellType);
 /* Public Functions =======================================================> */
 
 /* Initializes a page metadata object within the given `pagePtr`. */
-bool dzPageInitMetadata(dzByte *pagePtr, dzPageConfig config) {
+dzResult dzPageInitMetadata(dzByte *pagePtr, dzPageConfig config) {
     if (pagePtr == NULL || !dzIsValidCellType(config.cellType)
         || config.pageSizeInBytes == 0U)
-        return false;
+        return DZ_RESULT_INVALID_ARGUMENT;
 
     dzPageMetadata *pageMetadata =
         (dzPageMetadata *) (pagePtr + config.pageSizeInBytes);
@@ -125,7 +125,7 @@ bool dzPageInitMetadata(dzByte *pagePtr, dzPageConfig config) {
                                               * pageMetadata->peCycleCount);
     }
 
-    return true;
+    return DZ_RESULT_OK;
 }
 
 /* Returns the size of `dzPageMetadata`. */
@@ -159,11 +159,11 @@ dzPageState dzPageGetState(const dzByte *pagePtr, dzU32 pageSizeInBytes) {
 }
 
 /* Returns the read latency of a page. */
-bool dzPageGetReadLatency(const dzByte *pagePtr,
-                          dzU32 pageSizeInBytes,
-                          dzF64 *readLatency) {
+dzResult dzPageGetReadLatency(const dzByte *pagePtr,
+                              dzU32 pageSizeInBytes,
+                              dzF64 *readLatency) {
     if (pagePtr == NULL || pageSizeInBytes == 0U || readLatency == NULL)
-        return false;
+        return DZ_RESULT_INVALID_ARGUMENT;
 
     dzPageMetadata *pageMetadata = (dzPageMetadata *) (pagePtr
                                                        + pageSizeInBytes);
@@ -175,34 +175,37 @@ bool dzPageGetReadLatency(const dzByte *pagePtr,
                         DZ_PAGE_READ_LATENCY_STDDEV_RATIO
                             * readLatencyTable[pageMetadata->cellType]);
 
-    return true;
+    return DZ_RESULT_OK;
 }
 
 /* Marks a page as bad. */
-bool dzPageMarkAsBad(dzByte *pagePtr, dzU32 pageSizeInBytes) {
-    if (pagePtr == NULL || pageSizeInBytes == 0U) return false;
+dzResult dzPageMarkAsBad(dzByte *pagePtr, dzU32 pageSizeInBytes) {
+    if (pagePtr == NULL || pageSizeInBytes == 0U)
+        return DZ_RESULT_INVALID_ARGUMENT;
 
     dzPageMetadata *pageMetadata = (dzPageMetadata *) (pagePtr
                                                        + pageSizeInBytes);
 
     // NOTE: Free blocks can never be corrupted
-    if (pageMetadata->state == DZ_PAGE_STATE_FREE) return false;
+    if (pageMetadata->state == DZ_PAGE_STATE_FREE)
+        return DZ_RESULT_INVALID_STATE;
 
     pageMetadata->state = DZ_PAGE_STATE_BAD;
 
-    return true;
+    return DZ_RESULT_OK;
 }
 
 /* Marks a page as free. */
-bool dzPageMarkAsFree(dzByte *pagePtr, dzU32 pageSizeInBytes) {
-    if (pagePtr == NULL || pageSizeInBytes == 0U) return false;
+dzResult dzPageMarkAsFree(dzByte *pagePtr, dzU32 pageSizeInBytes) {
+    if (pagePtr == NULL || pageSizeInBytes == 0U)
+        return DZ_RESULT_INVALID_ARGUMENT;
 
     dzPageMetadata *pageMetadata = (dzPageMetadata *) (pagePtr
                                                        + pageSizeInBytes);
 
     if (pageMetadata->state == DZ_PAGE_STATE_BAD
         || pageMetadata->state == DZ_PAGE_STATE_FREE)
-        return false;
+        return DZ_RESULT_INVALID_STATE;
 
     pageMetadata->peCycleCount--;
 
@@ -210,32 +213,34 @@ bool dzPageMarkAsFree(dzByte *pagePtr, dzU32 pageSizeInBytes) {
                               ? DZ_PAGE_STATE_BAD
                               : DZ_PAGE_STATE_FREE;
 
-    return true;
+    return DZ_RESULT_OK;
 }
 
 /* Marks a page as unknown. */
-bool dzPageMarkAsUnknown(dzByte *pagePtr, dzU32 pageSizeInBytes) {
-    if (pagePtr == NULL || pageSizeInBytes == 0U) return false;
+dzResult dzPageMarkAsUnknown(dzByte *pagePtr, dzU32 pageSizeInBytes) {
+    if (pagePtr == NULL || pageSizeInBytes == 0U)
+        return DZ_RESULT_INVALID_ARGUMENT;
 
     dzPageMetadata *pageMetadata = (dzPageMetadata *) (pagePtr
                                                        + pageSizeInBytes);
 
     pageMetadata->state = DZ_PAGE_STATE_UNKNOWN;
 
-    return true;
+    return DZ_RESULT_OK;
 }
 
 /* Marks a page as valid. */
-bool dzPageMarkAsValid(dzByte *pagePtr,
-                       dzU32 pageSizeInBytes,
-                       dzF64 *programLatency) {
+dzResult dzPageMarkAsValid(dzByte *pagePtr,
+                           dzU32 pageSizeInBytes,
+                           dzF64 *programLatency) {
     if (pagePtr == NULL || pageSizeInBytes == 0U || programLatency == NULL)
-        return false;
+        return DZ_RESULT_INVALID_ARGUMENT;
 
     dzPageMetadata *pageMetadata = (dzPageMetadata *) (pagePtr
                                                        + pageSizeInBytes);
 
-    if (pageMetadata->state != DZ_PAGE_STATE_FREE) return false;
+    if (pageMetadata->state != DZ_PAGE_STATE_FREE)
+        return DZ_RESULT_INVALID_STATE;
 
     pageMetadata->totalProgramCount++;
 
@@ -246,7 +251,7 @@ bool dzPageMarkAsValid(dzByte *pagePtr,
                         DZ_PAGE_PROGRAM_LATENCY_STDDEV_RATIO
                             * programLatencyTable[pageMetadata->cellType]);
 
-    return true;
+    return DZ_RESULT_OK;
 }
 
 /* Private Functions ======================================================> */

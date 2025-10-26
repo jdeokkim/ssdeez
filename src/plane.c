@@ -55,8 +55,10 @@ const dzU64 DZ_PLANE_INVALID_ID = UINT64_MAX;
 /* Public Functions =======================================================> */
 
 /* Initializes a plane metadata within the given `metadata` region. */
-bool dzPlaneInitMetadata(dzPlaneMetadata *metadata, dzPlaneConfig config) {
-    if (metadata == NULL) return false;
+dzResult dzPlaneInitMetadata(dzPlaneMetadata *metadata, dzPlaneConfig config) {
+    if (metadata == NULL || config.blockCount == 0U
+        || config.planeId == DZ_PLANE_INVALID_ID)
+        return DZ_RESULT_INVALID_ARGUMENT;
 
     {
         metadata->blockStateMap = malloc(config.blockCount
@@ -74,7 +76,7 @@ bool dzPlaneInitMetadata(dzPlaneMetadata *metadata, dzPlaneConfig config) {
         // TODO: ...
     }
 
-    return true;
+    return DZ_RESULT_OK;
 }
 
 /* De-initializes the plane `metadata`. */
@@ -90,15 +92,15 @@ dzUSize dzPlaneGetMetadataSize(void) {
 }
 
 /* Updates the state of the given block within a plane's block state map. */
-bool dzPlaneUpdateBlockStateMap(dzPlaneMetadata *metadata,
-                                dzPBA pba,
-                                dzBlockState blockState) {
+dzResult dzPlaneUpdateBlockStateMap(dzPlaneMetadata *metadata,
+                                    dzPBA pba,
+                                    dzBlockState blockState) {
     if (metadata == NULL || metadata->blockStateMap == NULL
         || pba.planeId != metadata->planeId
         || pba.blockId == DZ_BLOCK_INVALID_ID)
-        return false;
+        return DZ_RESULT_INVALID_ARGUMENT;
 
     metadata->blockStateMap[pba.blockId] = blockState;
 
-    return true;
+    return DZ_RESULT_OK;
 }

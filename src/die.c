@@ -138,49 +138,63 @@ DZ_API_PRIVATE_INLINE dzByte *dzDiePPAToPtr(const dzDie *die, dzPPA ppa);
 
 /* Public Functions =======================================================> */
 
-/* Creates a die with the given `config`. */
-dzDie *dzDieCreate(dzDieConfig config) {
+/* Initializes `*die` with the given `config`. */
+dzResult dzDieInit(dzDie **die, dzDieConfig config) {
     // clang-format off
 
-    if (config.dieId == DZ_DIE_INVALID_ID
+    if (die == NULL
+        || config.dieId == DZ_DIE_INVALID_ID
         || config.cellType <= DZ_CELL_TYPE_UNKNOWN
         || config.cellType >= DZ_CELL_TYPE_COUNT_
         || config.planeCountPerDie == 0U 
         || config.blockCountPerPlane == 0U
         || config.pageCountPerBlock == 0U 
         || config.pageSizeInBytes == 0U)
-        return NULL;
+        return DZ_RESULT_INVALID_ARGUMENT;
 
     // clang-format on
 
-    dzDie *die = malloc(sizeof *die);
+    dzDie *newDie = malloc(sizeof *newDie);
 
-    if (die == NULL) return die;
+    if (newDie == NULL) return DZ_RESULT_NO_MEMORY;
 
     {
-        die->config = config;
+        newDie->config = config;
 
-        die->stats = (dzDieStatistics) { .totalProgramLatency = 0.0,
-                                         .totalProgramCount = 0U,
-                                         .totalReadLatency = 0.0,
-                                         .totalReadCount = 0U };
+        newDie->stats = (dzDieStatistics) { .totalProgramLatency = 0.0,
+                                            .totalProgramCount = 0U,
+                                            .totalReadLatency = 0.0,
+                                            .totalReadCount = 0U };
 
-        die->metadata = (dzDieMetadata) { .planes = NULL, .blocks = NULL };
+        newDie->metadata = (dzDieMetadata) { .planes = NULL, .blocks = NULL };
     }
 
-    if (!dzDieInitMetadata(die)
-        || (die->buffer = dzDieCreateBuffer(config, die->metadata)) == NULL
-        || !dzDieCorruptRandomBlocks(die)) {
-        dzDieRelease(die);
+    if (!dzDieInitMetadata(newDie)) {
+        dzDieDeinit(newDie);
 
-        return NULL;
+        return DZ_RESULT_INVALID_METADATA;
     }
 
-    return die;
+    if ((newDie->buffer = dzDieCreateBuffer(config, newDie->metadata))
+        == NULL) {
+        dzDieDeinit(newDie);
+
+        return DZ_RESULT_NO_MEMORY;
+    }
+
+    if (!dzDieCorruptRandomBlocks(newDie)) {
+        dzDieDeinit(newDie);
+
+        return DZ_RESULT_INJECTION_FAILED;
+    }
+
+    *die = newDie;
+
+    return DZ_RESULT_OK;
 }
 
 /* Releases the memory allocated for `die`. */
-void dzDieRelease(dzDie *die) {
+void dzDieDeinit(dzDie *die) {
     if (die == NULL) return;
 
     for (dzU64 i = 0U; i < die->metadata.blockCountPerDie; i++) {
@@ -317,11 +331,11 @@ dzPageState dzDieGetPageState(const dzDie *die, dzPPA ppa) {
 }
 
 /* Writes `srcBuffer` to the page corresponding to `ppa` in `die`. */
-bool dzDieProgramPage(dzDie *die, dzPPA ppa, dzSizedBuffer srcBuffer) {
+dzResult dzDieProgramPage(dzDie *die, dzPPA ppa, dzSizedBuffer srcBuffer) {
     dzByte *pagePtr = dzDiePPAToPtr(die, ppa);
 
     if (pagePtr == NULL || srcBuffer.ptr == NULL || srcBuffer.size == 0U)
-        return false;
+        return DZ_RESULT_INVALID_ARGUMENT;
 
     dzU64 blockIndex = (ppa.planeId * die->config.blockCountPerPlane)
                        + ppa.blockId;
@@ -331,41 +345,42 @@ bool dzDieProgramPage(dzDie *die, dzPPA ppa, dzSizedBuffer srcBuffer) {
                              + (blockIndex * dzBlockGetMetadataSize()));
 
     {
-        dzU64 nextPageId = DZ_PAGE_INVALID_ID;
-
-        // NOTE: Enforce "Sequential Page Programming"
-        if (!dzBlockGetNextPageId(blockMetadata, &nextPageId)
-            || ppa.pageId != nextPageId)
-            return false;
-    }
-
-    {
         dzF64 programLatency = -DBL_MAX;
 
         // NOTE: Erase-before-Write Property!
-        if (!dzPageMarkAsValid(pagePtr,
-                               die->config.pageSizeInBytes,
-                               &programLatency)
-            || (programLatency < 0.0))
-            return false;
+        if (dzPageMarkAsValid(pagePtr,
+                              die->config.pageSizeInBytes,
+                              &programLatency)
+            != DZ_RESULT_OK)
+            return DZ_RESULT_ALREADY_VALID;
 
         die->stats.totalProgramLatency += programLatency;
         die->stats.totalProgramCount++;
     }
 
     {
+        dzU64 nextPageId = DZ_PAGE_INVALID_ID;
+
+        // NOTE: Enforce "Sequential Page Programming"
+        if (dzBlockGetNextPageId(blockMetadata, &nextPageId) != DZ_RESULT_OK
+            || ppa.pageId != nextPageId)
+            return DZ_RESULT_INVALID_SEQUENCE;
+    }
+
+    {
         dzPageState pageState = dzDieGetPageState(die, ppa);
 
-        if (!dzBlockUpdatePageStateMap(blockMetadata, ppa, pageState))
-            return false;
+        if (dzBlockUpdatePageStateMap(blockMetadata, ppa, pageState)
+            != DZ_RESULT_OK)
+            return DZ_RESULT_MAP_UPDATE_FAILED;
 
         /*
             NOTE: Since at least one valid page is present in this block, 
                   it can be marked as active
         */
-        if (!dzBlockAdvanceNextPageId(blockMetadata)
-            || !dzBlockMarkAsActive(blockMetadata))
-            return false;
+        if (dzBlockAdvanceNextPageId(blockMetadata) != DZ_RESULT_OK
+            || dzBlockMarkAsActive(blockMetadata) != DZ_RESULT_OK)
+            return DZ_RESULT_INTERNAL_ERROR;
     }
 
     dzPlaneMetadata *planeMetadata =
@@ -375,8 +390,9 @@ bool dzDieProgramPage(dzDie *die, dzPPA ppa, dzSizedBuffer srcBuffer) {
     {
         dzBlockState blockState = dzDieGetBlockState(die, ppa);
 
-        if (!dzPlaneUpdateBlockStateMap(planeMetadata, ppa, blockState))
-            return false;
+        if (dzPlaneUpdateBlockStateMap(planeMetadata, ppa, blockState)
+            != DZ_RESULT_OK)
+            return DZ_RESULT_MAP_UPDATE_FAILED;
     }
 
     (void) memcpy(pagePtr,
@@ -385,27 +401,27 @@ bool dzDieProgramPage(dzDie *die, dzPPA ppa, dzSizedBuffer srcBuffer) {
                        ? srcBuffer.size
                        : die->config.pageSizeInBytes));
 
-    return true;
+    return DZ_RESULT_OK;
 }
 
 /* 
     Reads data from the page corresponding to `ppa` in `die`, 
     copying it to `dstBuffer`. 
 */
-bool dzDieReadPage(dzDie *die, dzPPA ppa, dzSizedBuffer dstBuffer) {
+dzResult dzDieReadPage(dzDie *die, dzPPA ppa, dzSizedBuffer dstBuffer) {
     dzByte *pagePtr = dzDiePPAToPtr(die, ppa);
 
     if (pagePtr == NULL || dstBuffer.ptr == NULL || dstBuffer.size == 0U)
-        return false;
+        return DZ_RESULT_INVALID_ARGUMENT;
 
     {
         dzF64 readLatency = -DBL_MAX;
 
-        if (!dzPageGetReadLatency(pagePtr,
-                                  die->config.pageSizeInBytes,
-                                  &readLatency)
-            || (readLatency < 0.0))
-            return false;
+        if (dzPageGetReadLatency(pagePtr,
+                                 die->config.pageSizeInBytes,
+                                 &readLatency)
+            != DZ_RESULT_OK)
+            return DZ_RESULT_INTERNAL_ERROR;
 
         die->stats.totalReadLatency += readLatency;
         die->stats.totalReadCount++;
@@ -417,14 +433,15 @@ bool dzDieReadPage(dzDie *die, dzPPA ppa, dzSizedBuffer dstBuffer) {
                        ? dstBuffer.size
                        : die->config.pageSizeInBytes));
 
-    return true;
+    return DZ_RESULT_OK;
 }
 
 /* Erases the block corresponding to `pba` in `die`. */
-bool dzDieEraseBlock(dzDie *die, dzPBA pba) {
-    if (die == NULL || !dzDieIsValidPBA(die, pba)) return false;
+dzResult dzDieEraseBlock(dzDie *die, dzPBA pba) {
+    if (die == NULL || !dzDieIsValidPBA(die, pba))
+        return DZ_RESULT_INVALID_ARGUMENT;
 
-    bool result = true;
+    dzResult result = DZ_RESULT_OK;
 
     dzU64 blockIndex = (pba.planeId * die->config.blockCountPerPlane)
                        + pba.blockId;
@@ -432,8 +449,9 @@ bool dzDieEraseBlock(dzDie *die, dzPBA pba) {
     dzDieForEachPageInBlock(die->buffer, die->metadata, blockIndex, pagePtr) {
         (void) memset(pagePtr, 0xFF, die->config.pageSizeInBytes);
 
-        if (!dzPageMarkAsFree(pagePtr, die->config.pageSizeInBytes)) {
-            result = false;
+        if (dzPageMarkAsFree(pagePtr, die->config.pageSizeInBytes)
+            != DZ_RESULT_OK) {
+            result = DZ_RESULT_ALREADY_ERASED;
 
             break;
         }
@@ -443,7 +461,7 @@ bool dzDieEraseBlock(dzDie *die, dzPBA pba) {
         (dzBlockMetadata *) (((dzByte *) die->metadata.blocks)
                              + (blockIndex * dzBlockGetMetadataSize()));
 
-    if (!result) {
+    if (result != DZ_RESULT_OK) {
         /* NOTE: Mark all pages in the block as bad */
 
         // clang-format off
@@ -463,8 +481,7 @@ bool dzDieEraseBlock(dzDie *die, dzPBA pba) {
 
             dzBlockState blockState = dzDieGetBlockState(die, pba);
 
-            if (!dzPlaneUpdateBlockStateMap(planeMetadata, pba, blockState))
-                return false;
+            (void) dzPlaneUpdateBlockStateMap(planeMetadata, pba, blockState);
         }
 
         return result;
@@ -473,9 +490,8 @@ bool dzDieEraseBlock(dzDie *die, dzPBA pba) {
     {
         dzF64 eraseLatency = -DBL_MAX;
 
-        if (!dzBlockMarkAsFree(blockMetadata, &eraseLatency)
-            || (eraseLatency < 0.0))
-            return false;
+        if (dzBlockMarkAsFree(blockMetadata, &eraseLatency) != DZ_RESULT_OK)
+            return DZ_RESULT_INTERNAL_ERROR;
 
         die->stats.totalEraseLatency += eraseLatency;
         die->stats.totalEraseCount++;
@@ -488,8 +504,9 @@ bool dzDieEraseBlock(dzDie *die, dzPBA pba) {
 
         dzBlockState blockState = dzDieGetBlockState(die, pba);
 
-        if (!dzPlaneUpdateBlockStateMap(planeMetadata, pba, blockState))
-            return false;
+        if (dzPlaneUpdateBlockStateMap(planeMetadata, pba, blockState)
+            != DZ_RESULT_OK)
+            return DZ_RESULT_MAP_UPDATE_FAILED;
     }
 
     return result;
@@ -545,7 +562,8 @@ static bool dzDieCorruptRandomBlocks(dzDie *die) {
 
             dzBlockState blockState = dzDieGetBlockState(die, pba);
 
-            if (!dzPlaneUpdateBlockStateMap(planeMetadata, pba, blockState))
+            if (dzPlaneUpdateBlockStateMap(planeMetadata, pba, blockState)
+                != DZ_RESULT_OK)
                 return false;
         }
 
@@ -606,7 +624,7 @@ static dzByte *dzDieCreateBuffer(dzDieConfig config, dzDieMetadata metadata) {
                                     .pageSizeInBytes = config.pageSizeInBytes,
                                     .cellType = config.cellType };
 
-        if (!dzPageInitMetadata(pagePtr, pageConfig)) {
+        if (dzPageInitMetadata(pagePtr, pageConfig) != DZ_RESULT_OK) {
             free(result);
 
             return NULL;
@@ -682,7 +700,8 @@ static bool dzDieInitBlockMetadata(dzDie *die) {
         blockConfig.pageCount = die->config.pageCountPerBlock;
         blockConfig.cellType = die->config.cellType;
 
-        if (!dzBlockInitMetadata(blockMetadata, blockConfig)) return false;
+        if (dzBlockInitMetadata(blockMetadata, blockConfig) != DZ_RESULT_OK)
+            return false;
 
         pba = dzDieGetNextPBA(die, pba);
     }
@@ -704,7 +723,8 @@ static bool dzDieInitPlaneMetadata(dzDie *die) {
         planeConfig.planeId = i;
         planeConfig.blockCount = die->config.blockCountPerPlane;
 
-        if (!dzPlaneInitMetadata(planeMetadata, planeConfig)) return false;
+        if (dzPlaneInitMetadata(planeMetadata, planeConfig) != DZ_RESULT_OK)
+            return false;
     }
 
     return true;
@@ -745,11 +765,8 @@ static bool dzDieInitMetadata(dzDie *die) {
         die->metadata.blocks = (dzBlockMetadata *) (extraBuffer
                                                     + totalPlaneMetadataSize);
 
-        if (!dzDieInitPlaneMetadata(die) || !dzDieInitBlockMetadata(die)) {
-            dzDieRelease(die);
-
+        if (!dzDieInitPlaneMetadata(die) || !dzDieInitBlockMetadata(die))
             return false;
-        }
     }
 
     return true;

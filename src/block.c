@@ -69,8 +69,8 @@ const dzU64 DZ_BLOCK_INVALID_ID = UINT64_MAX;
 /* Public Functions =======================================================> */
 
 /* Initializes a block metadata within the given `metadata` region. */
-bool dzBlockInitMetadata(dzBlockMetadata *metadata, dzBlockConfig config) {
-    if (metadata == NULL) return false;
+dzResult dzBlockInitMetadata(dzBlockMetadata *metadata, dzBlockConfig config) {
+    if (metadata == NULL) return DZ_RESULT_INVALID_ARGUMENT;
 
     {
         metadata->pageStateMap = malloc(config.pageCount
@@ -94,7 +94,7 @@ bool dzBlockInitMetadata(dzBlockMetadata *metadata, dzBlockConfig config) {
         metadata->state = DZ_BLOCK_STATE_FREE;
     }
 
-    return true;
+    return DZ_RESULT_OK;
 }
 
 /* De-initializes the block `metadata`. */
@@ -110,12 +110,13 @@ dzUSize dzBlockGetMetadataSize(void) {
 }
 
 /* Writes the next page identifier of a block to `nextPageId`. */
-bool dzBlockGetNextPageId(dzBlockMetadata *metadata, dzU64 *nextPageId) {
-    if (metadata == NULL || nextPageId == NULL) return false;
+dzResult dzBlockGetNextPageId(dzBlockMetadata *metadata, dzU64 *nextPageId) {
+    if (metadata == NULL || nextPageId == NULL)
+        return DZ_RESULT_INVALID_ARGUMENT;
 
     *nextPageId = metadata->nextPageId;
 
-    return true;
+    return DZ_RESULT_OK;
 }
 
 /* Returns the physical block address of a block. */
@@ -148,97 +149,109 @@ dzU64 dzBlockGetValidPageCount(const dzBlockMetadata *metadata) {
 }
 
 /* Advances the next page identifier of a block. */
-bool dzBlockAdvanceNextPageId(dzBlockMetadata *metadata) {
-    if (metadata == NULL) return false;
+dzResult dzBlockAdvanceNextPageId(dzBlockMetadata *metadata) {
+    if (metadata == NULL) return DZ_RESULT_INVALID_ARGUMENT;
 
     metadata->nextPageId++;
 
     if (metadata->nextPageId >= metadata->pageCount)
         metadata->nextPageId = DZ_PAGE_INVALID_ID;
 
-    return true;
+    return DZ_RESULT_OK;
 }
 
 /* Marks a block as active. */
-bool dzBlockMarkAsActive(dzBlockMetadata *metadata) {
-    if (metadata == NULL || metadata->state == DZ_BLOCK_STATE_BAD)
-        return false;
+dzResult dzBlockMarkAsActive(dzBlockMetadata *metadata) {
+    if (metadata == NULL) {
+        return DZ_RESULT_INVALID_ARGUMENT;
+    } else if (metadata->state == DZ_BLOCK_STATE_BAD) {
+        return DZ_RESULT_INVALID_STATE;
+    } else {
+        metadata->state = DZ_BLOCK_STATE_ACTIVE;
 
-    metadata->state = DZ_BLOCK_STATE_ACTIVE;
+        memset(metadata->pageStateMap,
+               DZ_PAGE_STATE_VALID,
+               metadata->pageCount);
 
-    memset(metadata->pageStateMap, DZ_PAGE_STATE_VALID, metadata->pageCount);
-
-    return true;
+        return DZ_RESULT_OK;
+    }
 }
 
 /* Marks a block as bad. */
-bool dzBlockMarkAsBad(dzBlockMetadata *metadata) {
-    if (metadata == NULL || metadata->state == DZ_BLOCK_STATE_FREE)
-        return false;
+dzResult dzBlockMarkAsBad(dzBlockMetadata *metadata) {
+    if (metadata == NULL) {
+        return DZ_RESULT_INVALID_ARGUMENT;
+    } else if (metadata->state == DZ_BLOCK_STATE_FREE) {
+        return DZ_RESULT_INVALID_ARGUMENT;
+    } else {
+        metadata->nextPageId = DZ_PAGE_INVALID_ID;
+        metadata->state = DZ_BLOCK_STATE_BAD;
 
-    metadata->nextPageId = DZ_PAGE_INVALID_ID;
-    metadata->state = DZ_BLOCK_STATE_BAD;
+        memset(metadata->pageStateMap, DZ_PAGE_STATE_BAD, metadata->pageCount);
 
-    memset(metadata->pageStateMap, DZ_PAGE_STATE_BAD, metadata->pageCount);
-
-    return true;
+        return DZ_RESULT_OK;
+    }
 }
 
 /* Marks a block as free. */
-bool dzBlockMarkAsFree(dzBlockMetadata *metadata, dzF64 *eraseLatency) {
-    if (metadata == NULL || eraseLatency == NULL
-        || metadata->state == DZ_BLOCK_STATE_BAD
-        || metadata->state == DZ_BLOCK_STATE_FREE)
-        return false;
+dzResult dzBlockMarkAsFree(dzBlockMetadata *metadata, dzF64 *eraseLatency) {
+    if (metadata == NULL || eraseLatency == NULL)
+        return DZ_RESULT_INVALID_ARGUMENT;
+    else if (metadata->state == DZ_BLOCK_STATE_BAD
+             || metadata->state == DZ_BLOCK_STATE_FREE) {
+        return DZ_RESULT_INVALID_STATE;
+    } else {
+        metadata->nextPageId = 0U;
+        metadata->state = DZ_BLOCK_STATE_FREE;
 
-    metadata->nextPageId = 0U;
-    metadata->state = DZ_BLOCK_STATE_FREE;
+        metadata->totalEraseCount++;
 
-    metadata->totalEraseCount++;
+        memset(metadata->pageStateMap,
+               DZ_PAGE_STATE_FREE,
+               metadata->pageCount);
 
-    memset(metadata->pageStateMap, DZ_PAGE_STATE_FREE, metadata->pageCount);
+        *eraseLatency =
+            dzUtilsGaussian(eraseLatencyTable[metadata->cellType],
+                            DZ_BLOCK_ERASE_LATENCY_STDDEV_RATIO
+                                * eraseLatencyTable[metadata->cellType]);
 
-    *eraseLatency =
-        dzUtilsGaussian(eraseLatencyTable[metadata->cellType],
-                        DZ_BLOCK_ERASE_LATENCY_STDDEV_RATIO
-                            * eraseLatencyTable[metadata->cellType]);
-
-    return true;
+        return DZ_RESULT_OK;
+    }
 }
 
 /* Marks a block as reserved. */
-bool dzBlockMarkAsReserved(dzBlockMetadata *metadata) {
-    if (metadata == NULL) return false;
+dzResult dzBlockMarkAsReserved(dzBlockMetadata *metadata) {
+    if (metadata == NULL) return DZ_RESULT_INVALID_ARGUMENT;
 
     metadata->state = DZ_BLOCK_STATE_RESERVED;
 
     // TODO: ...
 
-    return true;
+    return DZ_RESULT_OK;
 }
 
 /* Marks a block as unknown. */
-bool dzBlockMarkAsUnknown(dzBlockMetadata *metadata) {
-    if (metadata == NULL) return false;
+dzResult dzBlockMarkAsUnknown(dzBlockMetadata *metadata) {
+    if (metadata == NULL) return DZ_RESULT_INVALID_ARGUMENT;
 
     metadata->state = DZ_BLOCK_STATE_UNKNOWN;
 
     memset(metadata->pageStateMap, DZ_PAGE_STATE_UNKNOWN, metadata->pageCount);
 
-    return true;
+    return DZ_RESULT_OK;
 }
 
 /* Updates the state of the given page within a block's page state map. */
-bool dzBlockUpdatePageStateMap(dzBlockMetadata *metadata,
-                               dzPPA ppa,
-                               dzPageState pageState) {
+dzResult dzBlockUpdatePageStateMap(dzBlockMetadata *metadata,
+                                   dzPPA ppa,
+                                   dzPageState pageState) {
     if (metadata == NULL || metadata->nextPageId == DZ_PAGE_INVALID_ID
         || metadata->pageStateMap == NULL
         || !dzUtilsPBAEquals(metadata->pba, ppa)
         || ppa.pageId != metadata->nextPageId)
-        return false;
+        return DZ_RESULT_INVALID_ARGUMENT;
 
     metadata->pageStateMap[metadata->nextPageId] = pageState;
 
-    return true;
+    return DZ_RESULT_OK;
 }

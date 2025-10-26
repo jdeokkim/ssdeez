@@ -112,6 +112,24 @@ typedef double        dzF64;
 
 /* ========================================================================> */
 
+/* An enumeration that represents the result of an operation. */
+typedef enum dzResult_ {
+    DZ_RESULT_OK = 0,
+    DZ_RESULT_ALREADY_ERASED,
+    DZ_RESULT_ALREADY_VALID,
+    DZ_RESULT_INJECTION_FAILED,
+    DZ_RESULT_INTERNAL_ERROR,
+    DZ_RESULT_INVALID_ARGUMENT,
+    DZ_RESULT_INVALID_METADATA,
+    DZ_RESULT_INVALID_SEQUENCE,
+    DZ_RESULT_INVALID_STATE,
+    DZ_RESULT_MAP_UPDATE_FAILED,
+    DZ_RESULT_NO_MEMORY,
+    DZ_RESULT_COUNT_
+} dzResult;
+
+/* ========================================================================> */
+
 /* An enumeration that represents the state of a NAND flash block. */
 typedef enum dzBlockState_ {
     DZ_BLOCK_STATE_UNKNOWN = -1,
@@ -248,7 +266,7 @@ extern const dzU64 DZ_PAGE_INVALID_ID;
 /* <---------------------------------------------------------- [src/block.c] */
 
 /* Initializes a block `metadata` within the given region. */
-bool dzBlockInitMetadata(dzBlockMetadata *metadata, dzBlockConfig config);
+dzResult dzBlockInitMetadata(dzBlockMetadata *metadata, dzBlockConfig config);
 
 /* De-initializes the block `metadata`. */
 void dzBlockDeinitMetadata(dzBlockMetadata *metadata);
@@ -257,7 +275,7 @@ void dzBlockDeinitMetadata(dzBlockMetadata *metadata);
 dzUSize dzBlockGetMetadataSize(void);
 
 /* Writes the next page identifier of a block to `nextPageId`. */
-bool dzBlockGetNextPageId(dzBlockMetadata *metadata, dzU64 *nextPageId);
+dzResult dzBlockGetNextPageId(dzBlockMetadata *metadata, dzU64 *nextPageId);
 
 /* Returns the physical block address of a block. */
 dzPBA dzBlockGetPBA(const dzBlockMetadata *metadata);
@@ -269,35 +287,35 @@ dzBlockState dzBlockGetState(const dzBlockMetadata *metadata);
 dzU64 dzBlockGetValidPageCount(const dzBlockMetadata *metadata);
 
 /* Advances the next page identifier of a block. */
-bool dzBlockAdvanceNextPageId(dzBlockMetadata *metadata);
+dzResult dzBlockAdvanceNextPageId(dzBlockMetadata *metadata);
 
 /* Marks a block as active. */
-bool dzBlockMarkAsActive(dzBlockMetadata *metadata);
+dzResult dzBlockMarkAsActive(dzBlockMetadata *metadata);
 
 /* Marks a block as bad. */
-bool dzBlockMarkAsBad(dzBlockMetadata *metadata);
+dzResult dzBlockMarkAsBad(dzBlockMetadata *metadata);
 
 /* Marks a block as free. */
-bool dzBlockMarkAsFree(dzBlockMetadata *metadata, dzF64 *eraseLatency);
+dzResult dzBlockMarkAsFree(dzBlockMetadata *metadata, dzF64 *eraseLatency);
 
 /* Marks a block as reserved. */
-bool dzBlockMarkAsReserved(dzBlockMetadata *metadata);
+dzResult dzBlockMarkAsReserved(dzBlockMetadata *metadata);
 
 /* Marks a block as unknown. */
-bool dzBlockMarkAsUnknown(dzBlockMetadata *metadata);
+dzResult dzBlockMarkAsUnknown(dzBlockMetadata *metadata);
 
 /* Updates the state of the given page within a block's page state map. */
-bool dzBlockUpdatePageStateMap(dzBlockMetadata *metadata,
-                               dzPPA ppa,
-                               dzPageState pageState);
+dzResult dzBlockUpdatePageStateMap(dzBlockMetadata *metadata,
+                                   dzPPA ppa,
+                                   dzPageState pageState);
 
 /* <------------------------------------------------------------ [src/die.c] */
 
-/* Creates a die with the given `config`. */
-dzDie *dzDieCreate(dzDieConfig config);
+/* Initializes `*die` with the given `config`. */
+dzResult dzDieInit(dzDie **die, dzDieConfig config);
 
-/* Releases the memory allocated for the `die`. */
-void dzDieRelease(dzDie *die);
+/* Releases the memory allocated for `die`. */
+void dzDieDeinit(dzDie *die);
 
 /* Returns the total number of blocks in `die`. */
 dzU64 dzDieGetBlockCount(const dzDie *die);
@@ -327,21 +345,21 @@ dzU64 dzDieGetPageCount(const dzDie *die);
 dzPageState dzDieGetPageState(const dzDie *die, dzPPA ppa);
 
 /* Writes `srcBuffer` to the page corresponding to `ppa` in `die`. */
-bool dzDieProgramPage(dzDie *die, dzPPA ppa, dzSizedBuffer srcBuffer);
+dzResult dzDieProgramPage(dzDie *die, dzPPA ppa, dzSizedBuffer srcBuffer);
 
 /* 
     Reads data from the page corresponding to `ppa` in `die`, 
     copying it to `dstBuffer`. 
 */
-bool dzDieReadPage(dzDie *die, dzPPA ppa, dzSizedBuffer dstBuffer);
+dzResult dzDieReadPage(dzDie *die, dzPPA ppa, dzSizedBuffer dstBuffer);
 
 /* Erases the block corresponding to `pba` in `die`. */
-bool dzDieEraseBlock(dzDie *die, dzPBA pba);
+dzResult dzDieEraseBlock(dzDie *die, dzPBA pba);
 
 /* <----------------------------------------------------------- [src/page.c] */
 
 /* Initializes a page metadata within the given `pagePtr`. */
-bool dzPageInitMetadata(dzByte *pagePtr, dzPageConfig config);
+dzResult dzPageInitMetadata(dzByte *pagePtr, dzPageConfig config);
 
 /* Returns the size of `dzPageMetadata`. */
 dzUSize dzPageGetMetadataSize(void);
@@ -353,31 +371,28 @@ dzPPA dzPageGetPPA(const dzByte *pagePtr, dzU32 pageSizeInBytes);
 dzPageState dzPageGetState(const dzByte *pagePtr, dzU32 pageSizeInBytes);
 
 /* Returns the read latency of a page. */
-bool dzPageGetReadLatency(const dzByte *pagePtr,
-                          dzU32 pageSizeInBytes,
-                          dzF64 *readLatency);
+dzResult dzPageGetReadLatency(const dzByte *pagePtr,
+                              dzU32 pageSizeInBytes,
+                              dzF64 *readLatency);
 
 /* Marks a page as bad. */
-bool dzPageMarkAsBad(dzByte *pagePtr, dzU32 pageSizeInBytes);
+dzResult dzPageMarkAsBad(dzByte *pagePtr, dzU32 pageSizeInBytes);
 
 /* Marks a page as free. */
-bool dzPageMarkAsFree(dzByte *pagePtr, dzU32 pageSizeInBytes);
-
-/* Marks a page as reserved. */
-bool dzPageMarkAsReserved(dzByte *pagePtr, dzU32 pageSizeInBytes);
+dzResult dzPageMarkAsFree(dzByte *pagePtr, dzU32 pageSizeInBytes);
 
 /* Marks a page as unknown. */
-bool dzPageMarkAsUnknown(dzByte *pagePtr, dzU32 pageSizeInBytes);
+dzResult dzPageMarkAsUnknown(dzByte *pagePtr, dzU32 pageSizeInBytes);
 
 /* Marks a page as valid. */
-bool dzPageMarkAsValid(dzByte *pagePtr,
-                       dzU32 pageSizeInBytes,
-                       dzF64 *programLatency);
+dzResult dzPageMarkAsValid(dzByte *pagePtr,
+                           dzU32 pageSizeInBytes,
+                           dzF64 *programLatency);
 
 /* <---------------------------------------------------------- [src/plane.c] */
 
 /* Initializes a plane metadata within the given `metadata` region. */
-bool dzPlaneInitMetadata(dzPlaneMetadata *metadata, dzPlaneConfig config);
+dzResult dzPlaneInitMetadata(dzPlaneMetadata *metadata, dzPlaneConfig config);
 
 /* De-initializes the plane `metadata`. */
 void dzPlaneDeinitMetadata(dzPlaneMetadata *metadata);
@@ -386,9 +401,9 @@ void dzPlaneDeinitMetadata(dzPlaneMetadata *metadata);
 dzUSize dzPlaneGetMetadataSize(void);
 
 /* Updates the state of the given block within a plane's block state map. */
-bool dzPlaneUpdateBlockStateMap(dzPlaneMetadata *metadata,
-                                dzPBA pba,
-                                dzBlockState blockState);
+dzResult dzPlaneUpdateBlockStateMap(dzPlaneMetadata *metadata,
+                                    dzPBA pba,
+                                    dzBlockState blockState);
 
 /* <---------------------------------------------------------- [src/utils.c] */
 

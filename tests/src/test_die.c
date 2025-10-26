@@ -69,13 +69,13 @@ SUITE(dzTestDieOps) {
 static void dzTestSetupCb(void *ctx) {
     DZ_API_UNUSED_VARIABLE(ctx);
 
-    die = dzDieCreate(dieConfig);
+    (void) dzDieInit(&die, dieConfig);
 }
 
 static void dzTestTeardownCb(void *ctx) {
     DZ_API_UNUSED_VARIABLE(ctx);
 
-    dzDieRelease(die), die = NULL;
+    dzDieDeinit(die), die = NULL;
 }
 
 /* ========================================================================> */
@@ -101,10 +101,11 @@ TEST dzTestPageOps(void) {
          ppa = dzDieGetNextPPA(die, ppa)) {
         if (dzDieGetPageState(die, ppa) == DZ_PAGE_STATE_BAD) continue;
 
-        ASSERT_EQ(true, dzDieProgramPage(die, ppa, srcBuffer));
+        ASSERT_EQ(DZ_RESULT_OK, dzDieProgramPage(die, ppa, srcBuffer));
 
         // NOTE: This page is already programmed!
-        ASSERT_EQ(false, dzDieProgramPage(die, ppa, srcBuffer));
+        ASSERT_EQ(DZ_RESULT_ALREADY_VALID,
+                  dzDieProgramPage(die, ppa, srcBuffer));
     }
 
     dzByte dstData[sizeof srcData];
@@ -119,7 +120,7 @@ TEST dzTestPageOps(void) {
         // NOTE: Making sure `dzDieReadPage()` is doing its job well
         memset(dstBuffer.ptr, 0xFF, dstBuffer.size);
 
-        ASSERT_EQ(true, dzDieReadPage(die, ppa, dstBuffer));
+        ASSERT_EQ(DZ_RESULT_OK, dzDieReadPage(die, ppa, dstBuffer));
 
         ASSERT_MEM_EQ(srcBuffer.ptr, dstBuffer.ptr, srcBuffer.size);
     }
@@ -157,12 +158,12 @@ TEST dzTestBlockOps(void) {
 
         ASSERT_EQ(DZ_BLOCK_STATE_ACTIVE, dzDieGetBlockState(die, pba));
 
-        ASSERT_EQ(true, dzDieEraseBlock(die, pba));
+        ASSERT_EQ(DZ_RESULT_OK, dzDieEraseBlock(die, pba));
 
         ASSERT_EQ(DZ_BLOCK_STATE_FREE, dzDieGetBlockState(die, pba));
 
         // NOTE: Free blocks should not be erased again
-        ASSERT_EQ(false, dzDieEraseBlock(die, pba));
+        ASSERT_EQ(DZ_RESULT_ALREADY_ERASED, dzDieEraseBlock(die, pba));
     }
 
     {
@@ -176,7 +177,7 @@ TEST dzTestBlockOps(void) {
              ppa = dzDieGetNextPPA(die, ppa)) {
             if (dzDieGetPageState(die, ppa) == DZ_PAGE_STATE_BAD) continue;
 
-            ASSERT_EQ(true, dzDieReadPage(die, ppa, dstBuffer));
+            ASSERT_EQ(DZ_RESULT_OK, dzDieReadPage(die, ppa, dstBuffer));
 
             // NOTE: Check if all pages have been initialized to `0xFF`
             for (dzU64 k = 0; k < sizeof dstBuffer; k++)
