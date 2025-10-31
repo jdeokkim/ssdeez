@@ -55,6 +55,14 @@
 
 ### Incremental Step-Pulse Programming (ISPP)
 
+> The concept of Incremental Step-Pulse Programming (ISPP) can be thought of as seasoning 'soup', where 'soup' represents the amount of electrons trapped in the Floating Gate. 
+> 
+> The program pulse voltage is increased step by step, much like adding salt little by little. After each pulse, a verify operation checks the 'saltiness' (threshold voltage) of the 'soup,' until the desired level is reached.
+> 
+> The situation where you have to throw away your 'soup' because it's too salty (exceeds the desired voltage level) is called over-programming.
+>
+> — [Jaedeok Kim](https://github.com/jdeokkim)
+
 ---
 
 ## Controller

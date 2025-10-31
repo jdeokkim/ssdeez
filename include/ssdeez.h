@@ -37,6 +37,8 @@ extern "C" {
 
 /* Macros =================================================================> */
 
+// clang-format off
+
 /* Compiler-specific attribute for a function that must be always inlined. */
 #ifndef DZ_API_INLINE
     #ifdef _MSC_VER
@@ -55,11 +57,12 @@ extern "C" {
 #endif  // `DZ_API_INLINE`
 
 /* Ignores the "unused parameter" and "unused variable" errors. */
-#define DZ_API_UNUSED_VARIABLE(x) ((void) (x))
+#define DZ_API_UNUSED_VARIABLE(x)  ((void) (x))
+
+/* Represents the current API version of this project. */
+#define DZ_API_VERSION             "0.0.1"
 
 /* Macro-defined Constants ================================================> */
-
-// clang-format off
 
 /* Specifies the standard deviation ratio for the erase latency. */
 #define DZ_BLOCK_ERASE_LATENCY_STDDEV_RATIO    0.05

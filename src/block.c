@@ -251,7 +251,7 @@ dzResult dzBlockUpdatePageStateMap(dzBlockMetadata *metadata,
         || ppa.pageId != metadata->nextPageId)
         return DZ_RESULT_INVALID_ARGUMENT;
 
-    metadata->pageStateMap[metadata->nextPageId] = pageState;
+    metadata->pageStateMap[metadata->nextPageId] = (dzByte) pageState;
 
     return DZ_RESULT_OK;
 }

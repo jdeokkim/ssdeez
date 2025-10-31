@@ -10,7 +10,7 @@
 [![Code Size](https://img.shields.io/github/languages/code-size/jdeokkim/ssdeez?color=brightgreen)](https://github.com/jdeokkim/ssdeez)
 [![License](https://img.shields.io/github/license/jdeokkim/ssdeez)](https://github.com/jdeokkim/ssdeez/blob/main/LICENSE)
 
-I present SSDeez, a lightweight NAND flash-based SSD simulator written in C99, for educational purposes.
+I present SSDeez 🥜, A tiny NAND flash-based SSD simulator written in C.
 
 </div>
 
@@ -21,8 +21,9 @@ I present SSDeez, a lightweight NAND flash-based SSD simulator written in C99, f
 
 - Page
   - Data Area
-    - [x] Program/Read Operations
-    - [ ] Read "Parameter Page" Operation
+    - [x] "Program Page" Operation
+    - [x] "Read Page" Operation
+    - [ ] "Read Parameter Page" Operation
   - Out-Of-Band (OOB) Area
     - [ ] Error Correction Code (ECC)
     - [x] Layer-to-Layer Endurance Variation
@@ -32,7 +33,7 @@ I present SSDeez, a lightweight NAND flash-based SSD simulator written in C99, f
       - [ ] Last Read Time
       - [x] Total Program Count
       - [x] Total Read Count
-    - [x] Physical Page Address
+    - [x] Physical Page Address (PPA)
     - [x] "Probablistic" P/E Cycle Counts
     - [x] "Probablistic" Program/Read Latencies
     - [ ] Read Disturbance
@@ -42,8 +43,9 @@ I present SSDeez, a lightweight NAND flash-based SSD simulator written in C99, f
     - [ ] Last Erase Time
     - [x] Page State Bitmap
     - [x] Total Erase Count
-  - [x] Erase Operation
-  - [ ] Lock/Unlock Block(s) Operation
+  - [x] "Erase" Operation
+  - [ ] "Lock/Unlock Blocks" Operations
+  - [x] Physical Block Address (PBA)
   - [x] "Probablistic" Erase Latencies
   - [x] Sequential Page Programming
 - Plane
@@ -53,7 +55,7 @@ I present SSDeez, a lightweight NAND flash-based SSD simulator written in C99, f
 - Die
   - [x] Factory Bad Block Injection
     - [x] "Spatial Correlation" Model
-  - [ ] One-Time Programmable (OTP) Area
+  - [ ] One-Time Program (OTP) Area
 - Chip (Package)
   - [ ] [Open NAND Flash Interface (ONFI) 1.0](https://onfi.org)
 - Channel
@@ -65,7 +67,13 @@ I present SSDeez, a lightweight NAND flash-based SSD simulator written in C99, f
 
 ## Prerequisites
 
-<!-- TODO: ... -->
+- C99 Compiler
+  - Clang 4.0.1+
+  - GCC 4.9.3+
+- POSIX-conformant Make
+  - GNU Make 4.1+
+  - NetBSD Make 20160220+
+  - [Public Domain POSIX Make](https://github.com/rmyorston/pdpmake) 2.0.0+
 
 ## Build Instructions
 

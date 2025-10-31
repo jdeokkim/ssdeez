@@ -62,9 +62,8 @@ TARGET_LIB = ${LIBRARY_PATH}/lib${PROJECT_NAME}.a
 CC = cc
 AR = ar
 
-CFLAGS = -D_DEFAULT_SOURCE -g -I${INCLUDE_PATH} -O2 -std=c99
-
-CFLAGS += -fsanitize=address,leak,undefined -Wall -Wconversion \
+CFLAGS = -D_DEFAULT_SOURCE -g -I${INCLUDE_PATH} -O2 -std=c99 \
+	-fsanitize=address,leak,undefined -Wall -Wconversion \
 	-Wdouble-promotion -Werror -Wextra -Wpedantic
 
 LDLIBS = -lm

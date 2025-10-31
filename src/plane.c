@@ -100,7 +100,7 @@ dzResult dzPlaneUpdateBlockStateMap(dzPlaneMetadata *metadata,
         || pba.blockId == DZ_BLOCK_INVALID_ID)
         return DZ_RESULT_INVALID_ARGUMENT;
 
-    metadata->blockStateMap[pba.blockId] = blockState;
+    metadata->blockStateMap[pba.blockId] = (dzByte) blockState;
 
     return DZ_RESULT_OK;
 }
