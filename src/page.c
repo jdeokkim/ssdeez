@@ -81,7 +81,7 @@ const dzU64 DZ_PAGE_INVALID_ID = UINT64_MAX;
 /* Private Function Prototypes ============================================> */
 
 /* Returns `true` if `cellType` is a valid NAND flash cell type. */
-DZ_API_PRIVATE_INLINE bool dzIsValidCellType(dzCellType cellType);
+DZ_API_STATIC_INLINE bool dzIsValidCellType(dzCellType cellType);
 
 /* Public Functions =======================================================> */
 
@@ -257,6 +257,6 @@ dzResult dzPageMarkAsValid(dzByte *pagePtr,
 /* Private Functions ======================================================> */
 
 /* Returns `true` if `cellType` is a valid NAND flash cell type. */
-DZ_API_PRIVATE_INLINE bool dzIsValidCellType(dzCellType cellType) {
+DZ_API_STATIC_INLINE bool dzIsValidCellType(dzCellType cellType) {
     return (cellType > DZ_CELL_TYPE_UNKNOWN && cellType < DZ_CELL_TYPE_COUNT_);
 }

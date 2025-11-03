@@ -33,6 +33,7 @@
 /* A structure that represents the metadata of a NAND flash plane. */
 struct dzPlaneMetadata_ {
     dzByte *blockStateMap;
+    dzU64 leastEraseCount;
     dzU64 leastWornBlockId;
     dzU64 blockCount;
     dzU64 planeId;
@@ -69,7 +70,9 @@ dzResult dzPlaneInitMetadata(dzPlaneMetadata *metadata, dzPlaneConfig config) {
     }
 
     {
+        metadata->leastEraseCount = UINT64_MAX;
         metadata->leastWornBlockId = config.blockCount - 1U;
+
         metadata->blockCount = config.blockCount;
         metadata->planeId = config.planeId;
 
@@ -84,6 +87,12 @@ void dzPlaneDeinitMetadata(dzPlaneMetadata *metadata) {
     if (metadata == NULL) return;
 
     free(metadata->blockStateMap);
+}
+
+/* Returns the identifier of the least worn block within a plane. */
+dzU64 dzPlaneGetLeastWornBlockId(const dzPlaneMetadata *metadata) {
+    return (metadata != NULL) ? metadata->leastWornBlockId
+                              : DZ_BLOCK_INVALID_ID;
 }
 
 /* Returns the size of `dzPlaneMetadata`. */
@@ -101,6 +110,22 @@ dzResult dzPlaneUpdateBlockStateMap(dzPlaneMetadata *metadata,
         return DZ_RESULT_INVALID_ARGUMENT;
 
     metadata->blockStateMap[pba.blockId] = (dzByte) blockState;
+
+    return DZ_RESULT_OK;
+}
+
+/* Updates the information for the least worn block within a plane. */
+dzResult dzPlaneUpdateLeastWornBlock(dzPlaneMetadata *metadata,
+                                     dzPBA pba,
+                                     dzU64 eraseCount) {
+    if (metadata == NULL || pba.planeId != metadata->planeId
+        || pba.blockId == DZ_BLOCK_INVALID_ID)
+        return DZ_RESULT_INVALID_ARGUMENT;
+
+    if (metadata->leastEraseCount > eraseCount) {
+        metadata->leastEraseCount = eraseCount;
+        metadata->leastWornBlockId = pba.blockId;
+    }
 
     return DZ_RESULT_OK;
 }

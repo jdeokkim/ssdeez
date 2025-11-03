@@ -27,18 +27,20 @@
 
 /* Macros =================================================================> */
 
-// TODO: ...
+#define DZ_TEST_PAGE_SIZE_IN_BYTES 2048U
 
 /* Constants ==============================================================> */
 
 // NOTE: Based on the specs provided in the Samsung K9F2G08U0M datasheet
-static const dzDieConfig dieConfig = { .dieId = 0U,
-                                       .cellType = DZ_CELL_TYPE_SLC,
-                                       .badBlockRatio = 0.01,
-                                       .planeCountPerDie = 1U,
-                                       .blockCountPerPlane = 2048U,
-                                       .pageCountPerBlock = 64U,
-                                       .pageSizeInBytes = 2048U };
+static const dzDieConfig dieConfig = {
+    .dieId = 0U,
+    .cellType = DZ_CELL_TYPE_SLC,
+    .badBlockRatio = 0.01,
+    .planeCountPerDie = 1U,
+    .blockCountPerPlane = 2048U,
+    .pageCountPerBlock = 64U,
+    .pageSizeInBytes = DZ_TEST_PAGE_SIZE_IN_BYTES
+};
 
 /* Private Variables ======================================================> */
 
@@ -152,7 +154,7 @@ TEST dzTestBlockOps(void) {
             (void) dzDieProgramPage(die, ppa, srcBuffer);
     }
 
-    for (dzPPA pba = dzDieGetFirstPBA(die); pba.blockId != DZ_PAGE_INVALID_ID;
+    for (dzPBA pba = dzDieGetFirstPBA(die); pba.blockId != DZ_PAGE_INVALID_ID;
          pba = dzDieGetNextPBA(die, pba)) {
         if (dzDieGetBlockState(die, pba) == DZ_BLOCK_STATE_BAD) continue;
 
@@ -189,7 +191,65 @@ TEST dzTestBlockOps(void) {
 }
 
 TEST dzTestDieStats(void) {
-    // TODO: ...
+    ASSERT_NEQ(NULL, die);
+
+    {
+        dzByte srcData[DZ_TEST_PAGE_SIZE_IN_BYTES];
+
+        dzSizedBuffer srcBuffer = { .ptr = srcData, .size = sizeof srcData };
+
+        memset(srcData, (dzByte) 0xD5, srcBuffer.size);
+
+        dzU64 totalProgramCount = 0U;
+
+        for (dzPPA ppa = dzDieGetFirstPPA(die);
+             ppa.pageId != DZ_PAGE_INVALID_ID;
+             ppa = dzDieGetNextPPA(die, ppa)) {
+            if (dzDieGetPageState(die, ppa) == DZ_PAGE_STATE_BAD) continue;
+
+            ASSERT_EQ(DZ_RESULT_OK, dzDieProgramPage(die, ppa, srcBuffer));
+
+            totalProgramCount++;
+        }
+
+        ASSERT_EQ(dzDieGetTotalProgramCount(die), totalProgramCount);
+    }
+
+    {
+        dzByte dstData[DZ_TEST_PAGE_SIZE_IN_BYTES];
+
+        dzSizedBuffer dstBuffer = { .ptr = dstData, .size = sizeof dstData };
+
+        dzU64 totalReadCount = 0U;
+
+        for (dzPPA ppa = dzDieGetFirstPPA(die);
+             ppa.pageId != DZ_PAGE_INVALID_ID;
+             ppa = dzDieGetNextPPA(die, ppa)) {
+            if (dzDieGetPageState(die, ppa) == DZ_PAGE_STATE_BAD) continue;
+
+            ASSERT_EQ(DZ_RESULT_OK, dzDieReadPage(die, ppa, dstBuffer));
+
+            totalReadCount++;
+        }
+
+        ASSERT_EQ(dzDieGetTotalReadCount(die), totalReadCount);
+    }
+
+    {
+        dzU64 totalEraseCount = 0U;
+
+        for (dzPBA pba = dzDieGetFirstPBA(die);
+             pba.blockId != DZ_PAGE_INVALID_ID;
+             pba = dzDieGetNextPBA(die, pba)) {
+            if (dzDieGetBlockState(die, pba) == DZ_BLOCK_STATE_BAD) continue;
+
+            ASSERT_EQ(DZ_RESULT_OK, dzDieEraseBlock(die, pba));
+
+            totalEraseCount++;
+        }
+
+        ASSERT_EQ(dzDieGetTotalEraseCount(die), totalEraseCount);
+    }
 
     PASS();
 }

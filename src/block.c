@@ -136,6 +136,11 @@ dzBlockState dzBlockGetState(const dzBlockMetadata *metadata) {
     return (metadata != NULL) ? metadata->state : DZ_BLOCK_STATE_UNKNOWN;
 }
 
+/* Returns the total number of 'erase' operations performed on a block. */
+dzU64 dzBlockGetTotalEraseCount(const dzBlockMetadata *metadata) {
+    return (metadata != NULL) ? metadata->totalEraseCount : 0U;
+}
+
 /* Returns the number of valid pages in a block. */
 dzU64 dzBlockGetValidPageCount(const dzBlockMetadata *metadata) {
     if (metadata == NULL) return 0U;
@@ -182,7 +187,7 @@ dzResult dzBlockMarkAsBad(dzBlockMetadata *metadata) {
     if (metadata == NULL) {
         return DZ_RESULT_INVALID_ARGUMENT;
     } else if (metadata->state == DZ_BLOCK_STATE_FREE) {
-        return DZ_RESULT_INVALID_ARGUMENT;
+        return DZ_RESULT_INVALID_STATE;
     } else {
         metadata->nextPageId = DZ_PAGE_INVALID_ID;
         metadata->state = DZ_BLOCK_STATE_BAD;
@@ -243,12 +248,9 @@ dzResult dzBlockMarkAsUnknown(dzBlockMetadata *metadata) {
 
 /* Updates the state of the given page within a block's page state map. */
 dzResult dzBlockUpdatePageStateMap(dzBlockMetadata *metadata,
-                                   dzPPA ppa,
                                    dzPageState pageState) {
     if (metadata == NULL || metadata->nextPageId == DZ_PAGE_INVALID_ID
-        || metadata->pageStateMap == NULL
-        || !dzUtilsPBAEquals(metadata->pba, ppa)
-        || ppa.pageId != metadata->nextPageId)
+        || metadata->pageStateMap == NULL)
         return DZ_RESULT_INVALID_ARGUMENT;
 
     metadata->pageStateMap[metadata->nextPageId] = (dzByte) pageState;

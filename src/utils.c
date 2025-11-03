@@ -47,10 +47,10 @@ static dzU64 prngStates[4] = { 0x2025, 0x0926, 0x2116, 0x1200 };
 /* Private Function Prototypes ============================================> */
 
 /* Returns the next pseudo-random number from the xoshiro256+ generator. */
-DZ_API_PRIVATE_INLINE dzU64 dzUtilsXoshiroPlus(void);
+DZ_API_STATIC_INLINE dzU64 dzUtilsXoshiroPlus(void);
 
 /* Returns a pseudo-random number from an uniform distribution. */
-DZ_API_PRIVATE_INLINE dzF64 dzUtilsUniform(void);
+DZ_API_STATIC_INLINE dzF64 dzUtilsUniform(void);
 
 /* Public Functions =======================================================> */
 
@@ -114,7 +114,7 @@ dzF64 dzUtilsRandRangeF64(dzF64 min, dzF64 max) {
 /* Private Functions ======================================================> */
 
 /* Returns the next pseudo-random number from the xoshiro256+ generator. */
-DZ_API_PRIVATE_INLINE dzU64 dzUtilsXoshiroPlus(void) {
+DZ_API_STATIC_INLINE dzU64 dzUtilsXoshiroPlus(void) {
     /*
         NOTE: The original code was written in 2019
               by David Blackman and Sebastiano Vigna.
@@ -141,7 +141,7 @@ DZ_API_PRIVATE_INLINE dzU64 dzUtilsXoshiroPlus(void) {
 }
 
 /* Returns a pseudo-random number from an uniform distribution. */
-DZ_API_PRIVATE_INLINE dzF64 dzUtilsUniform(void) {
+DZ_API_STATIC_INLINE dzF64 dzUtilsUniform(void) {
     // NOTE: Extract the upper 53 bits, then multiply by 2^(-53)
     return 1.11022302462515654e-16 * ((dzF64) (dzUtilsXoshiroPlus() >> 11));
 }

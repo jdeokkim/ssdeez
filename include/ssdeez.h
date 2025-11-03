@@ -53,7 +53,7 @@ extern "C" {
         #define DZ_API_INLINE inline
     #endif
 
-    #define DZ_API_PRIVATE_INLINE static DZ_API_INLINE
+    #define DZ_API_STATIC_INLINE static DZ_API_INLINE
 #endif  // `DZ_API_INLINE`
 
 /* Ignores the "unused parameter" and "unused variable" errors. */
@@ -93,7 +93,7 @@ extern "C" {
 
 /* Typedefs ===============================================================> */
 
-/* Aliases for primitive integer types. */
+/* Aliases for primitive types. */
 
 typedef bool          dzBool;
 
@@ -286,6 +286,9 @@ dzPBA dzBlockGetPBA(const dzBlockMetadata *metadata);
 /* Returns the current state of a block. */
 dzBlockState dzBlockGetState(const dzBlockMetadata *metadata);
 
+/* Returns the total number of 'erase' operations performed on a block. */
+dzU64 dzBlockGetTotalEraseCount(const dzBlockMetadata *metadata);
+
 /* Returns the number of valid pages in a block. */
 dzU64 dzBlockGetValidPageCount(const dzBlockMetadata *metadata);
 
@@ -309,7 +312,6 @@ dzResult dzBlockMarkAsUnknown(dzBlockMetadata *metadata);
 
 /* Updates the state of the given page within a block's page state map. */
 dzResult dzBlockUpdatePageStateMap(dzBlockMetadata *metadata,
-                                   dzPPA ppa,
                                    dzPageState pageState);
 
 /* <------------------------------------------------------------ [src/die.c] */
@@ -320,11 +322,15 @@ dzResult dzDieInit(dzDie **die, dzDieConfig config);
 /* Releases the memory allocated for `die`. */
 void dzDieDeinit(dzDie *die);
 
+/* ========================================================================> */
+
 /* Returns the total number of blocks in `die`. */
 dzU64 dzDieGetBlockCount(const dzDie *die);
 
 /* Returns the current state of the block corresponding to `pba` in `die`. */
 dzBlockState dzDieGetBlockState(const dzDie *die, dzPBA pba);
+
+/* ========================================================================> */
 
 /* Returns the first physical block address within `die`. */
 dzPBA dzDieGetFirstPBA(const dzDie *die);
@@ -338,6 +344,8 @@ dzPBA dzDieGetNextPBA(const dzDie *die, dzPBA pba);
 /* Returns the next physical page address following `ppa` within `die`. */
 dzPPA dzDieGetNextPPA(const dzDie *die, dzPPA ppa);
 
+/* ========================================================================> */
+
 /* Returns the total number of pages in `die`. */
 dzU64 dzDieGetPageCount(const dzDie *die);
 
@@ -346,6 +354,22 @@ dzU64 dzDieGetPageCount(const dzDie *die);
     corresponding to `ppa` within `die`. 
 */
 dzPageState dzDieGetPageState(const dzDie *die, dzPPA ppa);
+
+/* ========================================================================> */
+
+/* Returns the physical block address of the least worn block within `die`. */
+dzPBA dzDieGetLeastWornBlockPBA(const dzDie *die);
+
+/* Returns the total number of 'program' operations performed on `die`. */
+dzU64 dzDieGetTotalProgramCount(const dzDie *die);
+
+/* Returns the total number of 'read' operations performed on `die`. */
+dzU64 dzDieGetTotalReadCount(const dzDie *die);
+
+/* Returns the total number of 'erase' operations performed on `die`. */
+dzU64 dzDieGetTotalEraseCount(const dzDie *die);
+
+/* ========================================================================> */
 
 /* Writes `srcBuffer` to the page corresponding to `ppa` in `die`. */
 dzResult dzDieProgramPage(dzDie *die, dzPPA ppa, dzSizedBuffer srcBuffer);
@@ -400,6 +424,9 @@ dzResult dzPlaneInitMetadata(dzPlaneMetadata *metadata, dzPlaneConfig config);
 /* De-initializes the plane `metadata`. */
 void dzPlaneDeinitMetadata(dzPlaneMetadata *metadata);
 
+/* Returns the identifier of the least worn block within a plane. */
+dzU64 dzPlaneGetLeastWornBlockId(const dzPlaneMetadata *metadata);
+
 /* Returns the size of `dzPlaneMetadata`. */
 dzUSize dzPlaneGetMetadataSize(void);
 
@@ -407,6 +434,11 @@ dzUSize dzPlaneGetMetadataSize(void);
 dzResult dzPlaneUpdateBlockStateMap(dzPlaneMetadata *metadata,
                                     dzPBA pba,
                                     dzBlockState blockState);
+
+/* Updates the information for the least worn block within a plane. */
+dzResult dzPlaneUpdateLeastWornBlock(dzPlaneMetadata *metadata,
+                                     dzPBA pba,
+                                     dzU64 eraseCount);
 
 /* <---------------------------------------------------------- [src/utils.c] */
 

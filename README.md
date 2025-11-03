@@ -23,7 +23,6 @@ I present SSDeez 🥜, A tiny NAND flash-based SSD simulator written in C.
   - Data Area
     - [x] "Program Page" Operation
     - [x] "Read Page" Operation
-    - [ ] "Read Parameter Page" Operation
   - Out-Of-Band (OOB) Area
     - [ ] Error Correction Code (ECC)
     - [x] Layer-to-Layer Endurance Variation
@@ -51,11 +50,11 @@ I present SSDeez 🥜, A tiny NAND flash-based SSD simulator written in C.
 - Plane
   - [ ] Plane-Level Statistics
     - [x] Block State Bitmap
-    - [ ] Least Worn Block
+    - [x] Least Worn Block
 - Die
   - [x] Factory Bad Block Injection
     - [x] "Spatial Correlation" Model
-  - [ ] One-Time Program (OTP) Area
+  - [ ] One-Time Programmable (OTP) Area
 - Chip (Package)
   - [ ] [Open NAND Flash Interface (ONFI) 1.0](https://onfi.org)
 - Channel
@@ -98,7 +97,7 @@ $ ./tests/bin/ssdeez-tests
 
 MIT License
 
-> Copyright (c) 2025 Jaedeok Kim <jdeokkim@protonmail.com>
+> Copyright (c) 2025 Jaedeok Kim (jdeokkim@protonmail.com)
 > 
 > Permission is hereby granted, free of charge, to any person obtaining a copy
 > of this software and associated documentation files (the "Software"), to deal
