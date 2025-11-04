@@ -32,15 +32,15 @@
 
 /* A structure that represents the metadata of a NAND flash page. */
 struct dzPageMetadata_ {
-    dzPPA ppa;
+    dzU32 factoryMarker;
+    dzPageState state;
+    dzPPA physicalPageAddress;
     dzU64 totalProgramCount;
     dzU64 totalReadCount;
     // dzF64 lastProgramTime;
     // dzF64 lastReadTime;
     dzU32 peCycleCount;
     dzCellType cellType;
-    dzPageState state;
-    // TODO: ...
 };
 
 /* Constants ==============================================================> */
@@ -95,7 +95,11 @@ dzResult dzPageInitMetadata(dzByte *pagePtr, dzPageConfig config) {
         (dzPageMetadata *) (pagePtr + config.pageSizeInBytes);
 
     {
-        pageMetadata->ppa = config.ppa;
+        pageMetadata->factoryMarker = 0x12345678;
+
+        pageMetadata->state = DZ_PAGE_STATE_FREE;
+
+        pageMetadata->physicalPageAddress = config.physicalPageAddress;
 
         pageMetadata->totalProgramCount = 0U;
         pageMetadata->totalReadCount = 0U;
@@ -104,8 +108,6 @@ dzResult dzPageInitMetadata(dzByte *pagePtr, dzPageConfig config) {
         // pageMetadata->lastReadTime = 0.0;
 
         pageMetadata->cellType = config.cellType;
-
-        pageMetadata->state = DZ_PAGE_STATE_FREE;
     }
 
     {
@@ -145,7 +147,7 @@ dzPPA dzPageGetPPA(const dzByte *pagePtr, dzU32 pageSizeInBytes) {
     dzPageMetadata *pageMetadata = (dzPageMetadata *) (pagePtr
                                                        + pageSizeInBytes);
 
-    return pageMetadata->ppa;
+    return pageMetadata->physicalPageAddress;
 }
 
 /* Returns the current state of a page. */
@@ -178,6 +180,16 @@ dzResult dzPageGetReadLatency(const dzByte *pagePtr,
     return DZ_RESULT_OK;
 }
 
+/* Returns `true` if the given page is factory-bad. */
+dzBool dzPageIsFactoryBad(dzByte *pagePtr, dzU32 pageSizeInBytes) {
+    if (pagePtr != NULL && pageSizeInBytes != 0U) return false;
+
+    dzPageMetadata *pageMetadata = (dzPageMetadata *) (pagePtr
+                                                       + pageSizeInBytes);
+
+    return (pageMetadata->factoryMarker == 0U);
+}
+
 /* Marks a page as bad. */
 dzResult dzPageMarkAsBad(dzByte *pagePtr, dzU32 pageSizeInBytes) {
     if (pagePtr == NULL || pageSizeInBytes == 0U)
@@ -189,6 +201,26 @@ dzResult dzPageMarkAsBad(dzByte *pagePtr, dzU32 pageSizeInBytes) {
     // NOTE: Free blocks can never be corrupted
     if (pageMetadata->state == DZ_PAGE_STATE_FREE)
         return DZ_RESULT_INVALID_STATE;
+
+    pageMetadata->state = DZ_PAGE_STATE_BAD;
+
+    return DZ_RESULT_OK;
+}
+
+/* Marks a page as factory-bad. */
+dzResult dzPageMarkAsFactoryBad(dzByte *pagePtr, dzU32 pageSizeInBytes) {
+    if (pagePtr == NULL || pageSizeInBytes == 0U)
+        return DZ_RESULT_INVALID_ARGUMENT;
+
+    dzPageMetadata *pageMetadata = (dzPageMetadata *) (pagePtr
+                                                       + pageSizeInBytes);
+
+    /*
+        NOTE: According to the ONFI 1.0 specification, 
+              at least one byte has to be `0x00`
+              in order to mark this page as defective
+    */
+    pageMetadata->factoryMarker = 0U;
 
     pageMetadata->state = DZ_PAGE_STATE_BAD;
 

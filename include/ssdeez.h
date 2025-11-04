@@ -217,7 +217,7 @@ typedef struct dzPlaneMetadata_ dzPlaneMetadata;
 
 /* A structure that represents the configuration of a NAND flash block. */
 typedef struct dzBlockConfig_ {
-    dzPBA pba;
+    dzPBA physicalBlockAddress;
     dzU64 pageCount;
     dzCellType cellType;
     // TODO: ...
@@ -230,7 +230,7 @@ typedef struct dzBlockMetadata_ dzBlockMetadata;
 
 /* A structure that represents the configuration of a NAND flash page. */
 typedef struct dzPageConfig_ {
-    dzPPA ppa;
+    dzPPA physicalPageAddress;
     dzF64 peCycleCountPenalty;
     dzU32 pageSizeInBytes;
     dzCellType cellType;
@@ -402,8 +402,14 @@ dzResult dzPageGetReadLatency(const dzByte *pagePtr,
                               dzU32 pageSizeInBytes,
                               dzF64 *readLatency);
 
+/* Returns `true` if the given page is factory-bad. */
+dzBool dzPageIsFactoryBad(dzByte *pagePtr, dzU32 pageSizeInBytes);
+
 /* Marks a page as bad. */
 dzResult dzPageMarkAsBad(dzByte *pagePtr, dzU32 pageSizeInBytes);
+
+/* Marks a page as factory-bad. */
+dzResult dzPageMarkAsFactoryBad(dzByte *pagePtr, dzU32 pageSizeInBytes);
 
 /* Marks a page as free. */
 dzResult dzPageMarkAsFree(dzByte *pagePtr, dzU32 pageSizeInBytes);

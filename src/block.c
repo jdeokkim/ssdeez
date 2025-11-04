@@ -35,7 +35,7 @@
 /* A structure that represents the metadata of a NAND flash block. */
 struct dzBlockMetadata_ {
     dzByte *pageStateMap;
-    dzPBA pba;
+    dzPBA physicalBlockAddress;
     dzU64 pageCount;
     dzU64 nextPageId;
     dzU64 totalEraseCount;
@@ -81,7 +81,7 @@ dzResult dzBlockInitMetadata(dzBlockMetadata *metadata, dzBlockConfig config) {
     }
 
     {
-        metadata->pba = config.pba;
+        metadata->physicalBlockAddress = config.physicalBlockAddress;
 
         metadata->pageCount = config.pageCount;
         metadata->nextPageId = 0U;
@@ -128,7 +128,7 @@ dzPBA dzBlockGetPBA(const dzBlockMetadata *metadata) {
                          .blockId = DZ_BLOCK_INVALID_ID,
                          .pageId = DZ_PAGE_INVALID_ID };
 
-    return metadata->pba;
+    return metadata->physicalBlockAddress;
 }
 
 /* Returns the current state of a block. */

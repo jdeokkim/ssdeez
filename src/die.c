@@ -276,9 +276,8 @@ dzPBA dzDieGetNextPBA(const dzDie *die, dzPBA pba) {
     if (pba.blockId >= die->config.blockCountPerPlane)
         pba.planeId++, pba.blockId = 0U;
 
-    return (pba.planeId < die->config.planeCountPerDie)
-               ? pba
-               : dzDieGetInvalidPPA();
+    return (pba.planeId < die->config.planeCountPerDie) ? pba
+                                                        : dzDieGetInvalidPPA();
 }
 
 /* Returns the next physical page address following `ppa` within `die`. */
@@ -459,11 +458,19 @@ dzResult dzDieEraseBlock(dzDie *die, dzPBA pba) {
 
         // clang-format off
 
-        dzDieForEachPageInBlock(die->buffer, die->metadata, blockIndex, pagePtr)
-            ((void) dzPageMarkAsBad(pagePtr, die->config.pageSizeInBytes));
+        dzDieForEachPageInBlock(die->buffer,
+                                die->metadata,
+                                blockIndex,
+                                pagePtr) {
+            ((void) dzPageMarkAsUnknown(pagePtr, 
+                                        die->config.pageSizeInBytes));
+            ((void) dzPageMarkAsBad(pagePtr,
+                                    die->config.pageSizeInBytes));
+        }
 
         // clang-format on
 
+        (void) dzBlockMarkAsUnknown(blockMetadata);
         (void) dzBlockMarkAsBad(blockMetadata);
 
         {
@@ -531,7 +538,7 @@ static bool dzDieCorruptRandomBlocks(dzDie *die) {
     // NOTE: Block #0 is always guaranteed to be a 'good' block
     dzU64 blockIndex = dzUtilsRandRange(1U, blockCountPerDie - 1);
 
-    while (badBlockCount > 0) {
+    while (badBlockCount > 0U) {
         dzBlockMetadata *blockMetadata = dzDieGetBlockMetadata(die,
                                                                blockIndex);
 
@@ -539,9 +546,14 @@ static bool dzDieCorruptRandomBlocks(dzDie *die) {
 
         // clang-format off
 
-        dzDieForEachPageInBlock(die->buffer, die->metadata, blockIndex, pagePtr) {
-            ((void) dzPageMarkAsUnknown(pagePtr, die->config.pageSizeInBytes));
-            ((void) dzPageMarkAsBad(pagePtr, die->config.pageSizeInBytes));
+        dzDieForEachPageInBlock(die->buffer,
+                                die->metadata,
+                                blockIndex,
+                                pagePtr) {
+            ((void) dzPageMarkAsUnknown(pagePtr, 
+                                        die->config.pageSizeInBytes));
+            ((void) dzPageMarkAsFactoryBad(pagePtr,
+                                           die->config.pageSizeInBytes));
         }
 
         // clang-format on
@@ -605,7 +617,7 @@ static dzByte *dzDieCreateBuffer(dzDieConfig config, dzDieMetadata metadata) {
                                     * DZ_PAGE_PE_CYCLE_COUNT_MAX_PENALTY);
         }
 
-        dzPPA ppa = {
+        dzPPA physicalPageAddress = {
             .dieId = config.dieId,
             .planeId = pageIndex / metadata.pageCountPerPlane,
             .blockId = (pageIndex % metadata.pageCountPerPlane)
@@ -614,7 +626,7 @@ static dzByte *dzDieCreateBuffer(dzDieConfig config, dzDieMetadata metadata) {
             // TODO: ...
         };
 
-        dzPageConfig pageConfig = { .ppa = ppa,
+        dzPageConfig pageConfig = { .physicalPageAddress = physicalPageAddress,
                                     .peCycleCountPenalty = peCycleCountPenalty,
                                     .pageSizeInBytes = config.pageSizeInBytes,
                                     .cellType = config.cellType };
@@ -678,21 +690,21 @@ static dzU64 dzDieGetAdjacentBlockIndex(dzDie *die, dzU64 blockIndex) {
 static bool dzDieInitBlockMetadata(dzDie *die) {
     if (die == NULL) return false;
 
-    dzPBA pba = dzDieGetFirstPBA(die);
+    dzPBA physicalBlockAddress = dzDieGetFirstPBA(die);
 
     for (dzU64 i = 0U; i < die->metadata.blockCountPerDie; i++) {
         dzBlockMetadata *blockMetadata = dzDieGetBlockMetadata(die, i);
 
         dzBlockConfig blockConfig;
 
-        blockConfig.pba = pba;
+        blockConfig.physicalBlockAddress = physicalBlockAddress;
         blockConfig.pageCount = die->config.pageCountPerBlock;
         blockConfig.cellType = die->config.cellType;
 
         if (dzBlockInitMetadata(blockMetadata, blockConfig) != DZ_RESULT_OK)
             return false;
 
-        pba = dzDieGetNextPBA(die, pba);
+        physicalBlockAddress = dzDieGetNextPBA(die, physicalBlockAddress);
     }
 
     return true;
