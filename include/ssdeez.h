@@ -118,7 +118,7 @@ typedef double        dzF64;
 /* An enumeration that represents the result of an operation. */
 typedef enum dzResult_ {
     DZ_RESULT_OK = 0,
-    DZ_RESULT_ALREADY_ERASED,
+    DZ_RESULT_ALREADY_FREE,
     DZ_RESULT_ALREADY_VALID,
     DZ_RESULT_INJECTION_FAILED,
     DZ_RESULT_INTERNAL_ERROR,
@@ -181,7 +181,45 @@ typedef dzPPA dzPBA;
 
 /* ========================================================================> */
 
-/* A structure that represents a group of NAND flash planes. */
+/* A structure that represents the configuration of a NAND flash page. */
+typedef struct dzPageConfig_ {
+    dzPPA physicalPageAddress;
+    dzF64 peCycleCountPenalty;
+    dzU32 pageSizeInBytes;
+    dzCellType cellType;
+} dzPageConfig;
+
+/* A structure that represents the metadata of a NAND flash page. */
+typedef struct dzPageMetadata_ dzPageMetadata;
+
+/* ========================================================================> */
+
+/* A structure that represents the configuration of a NAND flash block. */
+typedef struct dzBlockConfig_ {
+    dzPBA physicalBlockAddress;
+    dzU64 pageCount;
+    dzCellType cellType;
+    // TODO: ...
+} dzBlockConfig;
+
+/* A structure that represents the metadata of a NAND flash block. */
+typedef struct dzBlockMetadata_ dzBlockMetadata;
+
+/* ========================================================================> */
+
+/* A structure that represents the configuration of a NAND flash plane. */
+typedef struct dzPlaneConfig_ {
+    dzU64 planeId;
+    dzU64 blockCount;
+    // TODO: ...
+} dzPlaneConfig;
+
+/* A structure that represents the metadata of a NAND flash plane. */
+typedef struct dzPlaneMetadata_ dzPlaneMetadata;
+
+/* ========================================================================> */
+
+/* A structure that represents a NAND flash die. */
 typedef struct dzDie_ dzDie;
 
 /* A structure that represents the configuration of a NAND flash die. */
@@ -203,41 +241,16 @@ typedef struct dzDieStatistics_ dzDieStatistics;
 
 /* ========================================================================> */
 
-/* A structure that represents the configuration of a NAND flash plane. */
-typedef struct dzPlaneConfig_ {
-    dzU64 planeId;
-    dzU64 blockCount;
+/* A structure that represents a NAND flash chip. */
+typedef struct dzChip_ dzChip;
+
+/* A structure that represents the configuration of a NAND flash chip. */
+typedef struct dzChipConfig_ {
+    dzDieConfig dieConfig;
+    dzU64 chipId;
+    dzU32 dieCount;
     // TODO: ...
-} dzPlaneConfig;
-
-/* A structure that represents the metadata of a NAND flash plane. */
-typedef struct dzPlaneMetadata_ dzPlaneMetadata;
-
-/* ========================================================================> */
-
-/* A structure that represents the configuration of a NAND flash block. */
-typedef struct dzBlockConfig_ {
-    dzPBA physicalBlockAddress;
-    dzU64 pageCount;
-    dzCellType cellType;
-    // TODO: ...
-} dzBlockConfig;
-
-/* A structure that represents the metadata of a NAND flash block. */
-typedef struct dzBlockMetadata_ dzBlockMetadata;
-
-/* ========================================================================> */
-
-/* A structure that represents the configuration of a NAND flash page. */
-typedef struct dzPageConfig_ {
-    dzPPA physicalPageAddress;
-    dzF64 peCycleCountPenalty;
-    dzU32 pageSizeInBytes;
-    dzCellType cellType;
-} dzPageConfig;
-
-/* A structure that represents the metadata of a NAND flash page. */
-typedef struct dzPageMetadata_ dzPageMetadata;
+} dzChipConfig;
 
 /* ========================================================================> */
 
@@ -313,6 +326,18 @@ dzResult dzBlockMarkAsUnknown(dzBlockMetadata *metadata);
 /* Updates the state of the given page within a block's page state map. */
 dzResult dzBlockUpdatePageStateMap(dzBlockMetadata *metadata,
                                    dzPageState pageState);
+
+/* <----------------------------------------------------------- [src/chip.c] */
+
+/* Initializes `*chip` with the given `config`. */
+dzResult dzChipInit(dzChip **chip, dzChipConfig config);
+
+/* Releases the memory allocated for `chip`. */
+void dzChipDeinit(dzChip *chip);
+
+/* ========================================================================> */
+
+// TODO: ...
 
 /* <------------------------------------------------------------ [src/die.c] */
 

@@ -30,7 +30,12 @@
 
 /* Typedefs ===============================================================> */
 
-// TODO: ...
+/* A structure that represents a NAND flash chip. */
+struct dzChip_ {
+    dzChipConfig config;
+    dzDie *dies;
+    // TODO: ...
+};
 
 /* Constants ==============================================================> */
 

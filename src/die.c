@@ -77,7 +77,7 @@ struct dzDieStatistics_ {
     // TODO: ...
 };
 
-/* A structure that represents a group of NAND flash planes. */
+/* A structure that represents a NAND flash die. */
 struct dzDie_ {
     dzDieConfig config;
     dzDieStatistics stats;
@@ -445,7 +445,7 @@ dzResult dzDieEraseBlock(dzDie *die, dzPBA pba) {
 
         if (dzPageMarkAsFree(pagePtr, die->config.pageSizeInBytes)
             != DZ_RESULT_OK) {
-            result = DZ_RESULT_ALREADY_ERASED;
+            result = DZ_RESULT_ALREADY_FREE;
 
             break;
         }

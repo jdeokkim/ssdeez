@@ -165,7 +165,7 @@ TEST dzTestBlockOps(void) {
         ASSERT_EQ(DZ_BLOCK_STATE_FREE, dzDieGetBlockState(die, pba));
 
         // NOTE: Free blocks should not be erased again
-        ASSERT_EQ(DZ_RESULT_ALREADY_ERASED, dzDieEraseBlock(die, pba));
+        ASSERT_EQ(DZ_RESULT_ALREADY_FREE, dzDieEraseBlock(die, pba));
     }
 
     {
