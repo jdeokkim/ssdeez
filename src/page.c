@@ -241,7 +241,7 @@ dzResult dzPageMarkAsFree(dzByte *pagePtr, dzU32 pageSizeInBytes) {
 
     pageMetadata->peCycleCount--;
 
-    pageMetadata->state = (pageMetadata->peCycleCount == 0)
+    pageMetadata->state = (pageMetadata->peCycleCount == 0U)
                               ? DZ_PAGE_STATE_BAD
                               : DZ_PAGE_STATE_FREE;
 

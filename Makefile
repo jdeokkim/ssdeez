@@ -50,6 +50,7 @@ OBJECTS = \
 	${SOURCE_PATH}/block.o  \
 	${SOURCE_PATH}/chip.o   \
 	${SOURCE_PATH}/die.o    \
+	${SOURCE_PATH}/onfi.o   \
 	${SOURCE_PATH}/page.o   \
 	${SOURCE_PATH}/plane.o  \
 	${SOURCE_PATH}/utils.o
