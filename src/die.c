@@ -229,6 +229,11 @@ void dzDieDeinit(dzDie *die) {
     free(die->metadata.planes), free(die->buffer), free(die);
 }
 
+/* Returns the size of `dzDie`. */
+dzUSize dzDieGetStructSize(void) {
+    return sizeof(dzDie);
+}
+
 /* Returns the total number of blocks in `die`. */
 dzU64 dzDieGetBlockCount(const dzDie *die) {
     return (die != NULL) ? die->metadata.blockCountPerDie : 0U;

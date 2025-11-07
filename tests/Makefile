@@ -49,8 +49,9 @@ SSDEEZ_INCLUDE_PATH = ../include
 SSDEEZ_LIBRARY_PATH = ../lib
 
 OBJECTS = \
-	${SOURCE_PATH}/test_die.o  \
-	${SOURCE_PATH}/test_utils.o    \
+	${SOURCE_PATH}/test_chip.o   \
+	${SOURCE_PATH}/test_die.o    \
+	${SOURCE_PATH}/test_utils.o  \
 	${SOURCE_PATH}/main.o
 
 TARGET = ${BINARY_PATH}/${PROJECT_NAME}

@@ -33,7 +33,7 @@
 /* A structure that represents a NAND flash chip. */
 struct dzChip_ {
     dzChipConfig config;
-    dzDie *dies;
+    dzDie **dies;
     // TODO: ...
 };
 
@@ -52,4 +52,50 @@ const dzU64 DZ_CHIP_INVALID_ID = UINT64_MAX;
 
 /* Public Functions =======================================================> */
 
-// TODO: ...
+/* Initializes `*chip` with the given `config`. */
+dzResult dzChipInit(dzChip **chip, dzChipConfig config) {
+    // clang-format off
+
+    if (chip == NULL
+        || config.dieConfig == NULL
+        || config.chipId == DZ_CHIP_INVALID_ID
+        || config.dieCount == 0U)
+        return DZ_RESULT_INVALID_ARGUMENT;
+
+    // clang-format on
+
+    dzChip *newChip = malloc(sizeof *newChip);
+
+    if (newChip == NULL) return DZ_RESULT_NO_MEMORY;
+
+    {
+        newChip->config = config;
+
+        newChip->dies = malloc(config.dieCount * sizeof *(newChip->dies));
+
+        for (dzU32 i = 0; i < config.dieCount; i++) {
+            config.dieConfig->dieId = i;
+
+            if (dzDieInit(&(newChip->dies[i]), *(config.dieConfig))
+                != DZ_RESULT_OK) {
+                free(newChip->dies), free(newChip);
+
+                return DZ_RESULT_INTERNAL_ERROR;
+            }
+        }
+    }
+
+    *chip = newChip;
+
+    return DZ_RESULT_OK;
+}
+
+/* Releases the memory allocated for `chip`. */
+void dzChipDeinit(dzChip *chip) {
+    if (chip == NULL) return;
+
+    for (dzU32 i = 0; i < chip->config.dieCount; i++)
+        (void) dzDieDeinit(chip->dies[i]);
+
+    free(chip->dies), free(chip);
+}

@@ -246,7 +246,7 @@ typedef struct dzChip_ dzChip;
 
 /* A structure that represents the configuration of a NAND flash chip. */
 typedef struct dzChipConfig_ {
-    dzDieConfig dieConfig;
+    dzDieConfig *dieConfig;
     dzU64 chipId;
     dzU32 dieCount;
     // TODO: ...
@@ -346,6 +346,9 @@ dzResult dzDieInit(dzDie **die, dzDieConfig config);
 
 /* Releases the memory allocated for `die`. */
 void dzDieDeinit(dzDie *die);
+
+/* Returns the size of `dzDie`. */
+dzUSize dzDieGetStructSize(void);
 
 /* ========================================================================> */
 

@@ -31,7 +31,7 @@
 
 /* Constants ==============================================================> */
 
-// NOTE: Based on the specs provided in the Samsung K9F2G08U0M datasheet
+// NOTE: K9F2G08U0M
 static const dzDieConfig dieConfig = {
     .dieId = 0U,
     .cellType = DZ_CELL_TYPE_SLC,
@@ -57,7 +57,7 @@ TEST dzTestDieStats(void);
 
 /* Public Functions =======================================================> */
 
-SUITE(dzTestDieOps) {
+SUITE(dzTestDie) {
     SET_SETUP(dzTestSetupCb, NULL);
     SET_TEARDOWN(dzTestTeardownCb, NULL);
 
