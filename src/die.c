@@ -331,11 +331,11 @@ dzU64 dzDieGetTotalEraseCount(const dzDie *die) {
     return (die != NULL) ? die->stats.totalEraseCount : 0U;
 }
 
-/* Writes `srcBuffer` to the page corresponding to `ppa` in `die`. */
-dzResult dzDieProgramPage(dzDie *die, dzPPA ppa, dzSizedBuffer srcBuffer) {
+/* Writes `src.ptr` to the page corresponding to `ppa` in `die`. */
+dzResult dzDieProgramPage(dzDie *die, dzPPA ppa, dzByteArray src) {
     dzByte *pagePtr = dzDiePPAToPtr(die, ppa);
 
-    if (pagePtr == NULL || srcBuffer.ptr == NULL || srcBuffer.size == 0U)
+    if (pagePtr == NULL || src.ptr == NULL || src.size == 0U)
         return DZ_RESULT_INVALID_ARGUMENT;
 
     dzU64 blockIndex = (ppa.planeId * die->config.blockCountPerPlane)
@@ -395,9 +395,9 @@ dzResult dzDieProgramPage(dzDie *die, dzPPA ppa, dzSizedBuffer srcBuffer) {
     }
 
     (void) memcpy(pagePtr,
-                  srcBuffer.ptr,
-                  ((srcBuffer.size < die->config.pageSizeInBytes)
-                       ? srcBuffer.size
+                  src.ptr,
+                  ((src.size < die->config.pageSizeInBytes)
+                       ? src.size
                        : die->config.pageSizeInBytes));
 
     return DZ_RESULT_OK;
@@ -405,12 +405,12 @@ dzResult dzDieProgramPage(dzDie *die, dzPPA ppa, dzSizedBuffer srcBuffer) {
 
 /* 
     Reads data from the page corresponding to `ppa` in `die`, 
-    copying it to `dstBuffer`. 
+    copying it to `dst.ptr`. 
 */
-dzResult dzDieReadPage(dzDie *die, dzPPA ppa, dzSizedBuffer dstBuffer) {
+dzResult dzDieReadPage(dzDie *die, dzPPA ppa, dzByteArray dst) {
     dzByte *pagePtr = dzDiePPAToPtr(die, ppa);
 
-    if (pagePtr == NULL || dstBuffer.ptr == NULL || dstBuffer.size == 0U)
+    if (pagePtr == NULL || dst.ptr == NULL || dst.size == 0U)
         return DZ_RESULT_INVALID_ARGUMENT;
 
     {
@@ -426,10 +426,10 @@ dzResult dzDieReadPage(dzDie *die, dzPPA ppa, dzSizedBuffer dstBuffer) {
         die->stats.totalReadCount++;
     }
 
-    (void) memcpy(dstBuffer.ptr,
+    (void) memcpy(dst.ptr,
                   pagePtr,
-                  ((dstBuffer.size < die->config.pageSizeInBytes)
-                       ? dstBuffer.size
+                  ((dst.size < die->config.pageSizeInBytes)
+                       ? dst.size
                        : die->config.pageSizeInBytes));
 
     return DZ_RESULT_OK;

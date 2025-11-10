@@ -94,8 +94,8 @@ TEST dzTestPageOps(void) {
 
     // clang-format on
 
-    dzSizedBuffer srcBuffer = { .ptr = (dzByte *) srcData,
-                                .size = sizeof srcData };
+    dzByteArray srcBuffer = { .ptr = (dzByte *) srcData,
+                              .size = sizeof srcData };
 
     ASSERT_LTE(srcBuffer.size, dieConfig.pageSizeInBytes);
 
@@ -112,8 +112,8 @@ TEST dzTestPageOps(void) {
 
     dzByte dstData[sizeof srcData];
 
-    dzSizedBuffer dstBuffer = { .ptr = (dzByte *) dstData,
-                                .size = sizeof dstData };
+    dzByteArray dstBuffer = { .ptr = (dzByte *) dstData,
+                              .size = sizeof dstData };
 
     for (dzPPA ppa = dzDieGetFirstPPA(die); ppa.pageId != DZ_PAGE_INVALID_ID;
          ppa = dzDieGetNextPPA(die, ppa)) {
@@ -142,8 +142,8 @@ TEST dzTestBlockOps(void) {
 
     // clang-format on
 
-    dzSizedBuffer srcBuffer = { .ptr = (dzByte *) srcData,
-                                .size = sizeof srcData };
+    dzByteArray srcBuffer = { .ptr = (dzByte *) srcData,
+                              .size = sizeof srcData };
 
     ASSERT_LTE(srcBuffer.size, dieConfig.pageSizeInBytes);
 
@@ -171,8 +171,8 @@ TEST dzTestBlockOps(void) {
     {
         dzByte dstData[sizeof srcData];
 
-        dzSizedBuffer dstBuffer = { .ptr = (dzByte *) dstData,
-                                    .size = sizeof dstData };
+        dzByteArray dstBuffer = { .ptr = (dzByte *) dstData,
+                                  .size = sizeof dstData };
 
         for (dzPPA ppa = dzDieGetFirstPPA(die);
              ppa.pageId != DZ_PAGE_INVALID_ID;
@@ -196,7 +196,7 @@ TEST dzTestDieStats(void) {
     {
         dzByte srcData[DZ_TEST_PAGE_SIZE_IN_BYTES];
 
-        dzSizedBuffer srcBuffer = { .ptr = srcData, .size = sizeof srcData };
+        dzByteArray srcBuffer = { .ptr = srcData, .size = sizeof srcData };
 
         memset(srcData, (dzByte) 0xD5, srcBuffer.size);
 
@@ -218,7 +218,7 @@ TEST dzTestDieStats(void) {
     {
         dzByte dstData[DZ_TEST_PAGE_SIZE_IN_BYTES];
 
-        dzSizedBuffer dstBuffer = { .ptr = dstData, .size = sizeof dstData };
+        dzByteArray dstBuffer = { .ptr = dstData, .size = sizeof dstData };
 
         dzU64 totalReadCount = 0U;
 

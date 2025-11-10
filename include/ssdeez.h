@@ -105,6 +105,7 @@ typedef size_t        dzUSize;
 typedef int32_t       dzI32;
 typedef int64_t       dzI64;
 
+typedef uint16_t      dzU16;
 typedef uint32_t      dzU32;
 typedef uint64_t      dzU64;
 
@@ -254,11 +255,18 @@ typedef struct dzChipConfig_ {
 
 /* ========================================================================> */
 
-/* A structure that represents a buffer with a fixed size. */
-typedef struct dzSizedBuffer_ {
+/* A structure that represents a byte array. */
+typedef struct dzByteArray_ {
     dzByte *ptr;
     dzUSize size;
-} dzSizedBuffer;
+} dzByteArray;
+
+/* A structure that represents a byte stream. */
+typedef struct dzByteStream_ {
+    dzByte *ptr;
+    dzUSize size;
+    dzUSize offset;
+} dzByteStream;
 
 /* Constants ==============================================================> */
 
@@ -399,17 +407,27 @@ dzU64 dzDieGetTotalEraseCount(const dzDie *die);
 
 /* ========================================================================> */
 
-/* Writes `srcBuffer` to the page corresponding to `ppa` in `die`. */
-dzResult dzDieProgramPage(dzDie *die, dzPPA ppa, dzSizedBuffer srcBuffer);
+/* Writes `src.ptr` to the page corresponding to `ppa` in `die`. */
+dzResult dzDieProgramPage(dzDie *die, dzPPA ppa, dzByteArray src);
 
 /* 
     Reads data from the page corresponding to `ppa` in `die`, 
-    copying it to `dstBuffer`. 
+    copying it to `dst.ptr`. 
 */
-dzResult dzDieReadPage(dzDie *die, dzPPA ppa, dzSizedBuffer dstBuffer);
+dzResult dzDieReadPage(dzDie *die, dzPPA ppa, dzByteArray dst);
 
 /* Erases the block corresponding to `pba` in `die`. */
 dzResult dzDieEraseBlock(dzDie *die, dzPBA pba);
+
+/* <----------------------------------------------------------- [src/onfi.c] */
+
+/* 
+    Creates a new ONFI parameter page based on the `config`, 
+    and writes the contents of it to `dst.ptr`.
+*/
+dzResult dzOnfiCreateParameterPage(dzDieConfig config, dzByteArray dst);
+
+// TODO: ...
 
 /* <----------------------------------------------------------- [src/page.c] */
 
