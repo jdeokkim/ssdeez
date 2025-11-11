@@ -77,7 +77,7 @@ extern "C" {
     Maximum penalty factor applied to the maximum number of 
     P/E cycles per page, for each layer in a block.
 */
-#define DZ_PAGE_PE_CYCLE_COUNT_MAX_PENALTY     0.25
+#define DZ_PAGE_ENDURANCE_MAX_PENALTY          0.25
 
 /*
     Specifies the standard deviation ratio for initializing 
@@ -185,7 +185,7 @@ typedef dzPPA dzPBA;
 /* A structure that represents the configuration of a NAND flash page. */
 typedef struct dzPageConfig_ {
     dzPPA physicalPageAddress;
-    dzF64 peCycleCountPenalty;
+    dzF64 endurancePenalty;
     dzU32 pageSizeInBytes;
     dzCellType cellType;
 } dzPageConfig;
@@ -355,6 +355,9 @@ dzResult dzDieInit(dzDie **die, dzDieConfig config);
 /* Releases the memory allocated for `die`. */
 void dzDieDeinit(dzDie *die);
 
+/* Returns the configuration of `die`. */
+dzDieConfig dzDieGetConfig(const dzDie *die);
+
 /* Returns the size of `dzDie`. */
 dzUSize dzDieGetStructSize(void);
 
@@ -382,6 +385,9 @@ dzPPA dzDieGetNextPPA(const dzDie *die, dzPPA ppa);
 
 /* ========================================================================> */
 
+/* Returns the maximum P/E cycles among all pages within `die`. */
+dzU32 dzDieGetMaxPeCycles(const dzDie *die);
+
 /* Returns the total number of pages in `die`. */
 dzU64 dzDieGetPageCount(const dzDie *die);
 
@@ -392,9 +398,6 @@ dzU64 dzDieGetPageCount(const dzDie *die);
 dzPageState dzDieGetPageState(const dzDie *die, dzPPA ppa);
 
 /* ========================================================================> */
-
-/* Returns the physical block address of the least worn block within `die`. */
-dzPBA dzDieGetLeastWornBlockPBA(const dzDie *die);
 
 /* Returns the total number of 'program' operations performed on `die`. */
 dzU64 dzDieGetTotalProgramCount(const dzDie *die);
@@ -422,10 +425,10 @@ dzResult dzDieEraseBlock(dzDie *die, dzPBA pba);
 /* <----------------------------------------------------------- [src/onfi.c] */
 
 /* 
-    Creates a new ONFI parameter page based on the `config`, 
+    Creates a new ONFI parameter page based on `die`'s configuration, 
     and writes the contents of it to `dst.ptr`.
 */
-dzResult dzOnfiCreateParameterPage(dzDieConfig config, dzByteArray dst);
+dzResult dzOnfiCreateParameterPage(const dzDie *die, dzByteArray dst);
 
 // TODO: ...
 
@@ -433,6 +436,9 @@ dzResult dzOnfiCreateParameterPage(dzDieConfig config, dzByteArray dst);
 
 /* Initializes a page metadata within the given `pagePtr`. */
 dzResult dzPageInitMetadata(dzByte *pagePtr, dzPageConfig config);
+
+/* Returns the maximum P/E cycles of a page. */
+dzU32 dzPageGetMaxPeCycles(const dzByte *pagePtr, dzU32 pageSizeInBytes);
 
 /* Returns the size of `dzPageMetadata`. */
 dzUSize dzPageGetMetadataSize(void);

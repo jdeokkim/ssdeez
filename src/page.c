@@ -39,14 +39,15 @@ struct dzPageMetadata_ {
     dzU64 totalReadCount;
     // dzF64 lastProgramTime;
     // dzF64 lastReadTime;
-    dzU32 peCycleCount;
+    dzU32 maxPeCycles;
+    dzU32 endurance;
     dzCellType cellType;
 };
 
 /* Constants ==============================================================> */
 
 /* Average numbers of P/E cycles per page, for each cell type. */
-static const dzU32 peCycleCountTable[DZ_CELL_TYPE_COUNT_] = {
+static const dzU32 enduranceTable[DZ_CELL_TYPE_COUNT_] = {
     [DZ_CELL_TYPE_SLC] = 85000U,
     [DZ_CELL_TYPE_MLC] = 19000U,
     [DZ_CELL_TYPE_TLC] = 2250U,
@@ -113,21 +114,33 @@ dzResult dzPageInitMetadata(dzByte *pagePtr, dzPageConfig config) {
     {
         // clang-format off
 
-        pageMetadata->peCycleCount = (dzU32) dzUtilsGaussian(
-            peCycleCountTable[config.cellType], 
+        pageMetadata->maxPeCycles = (dzU32) dzUtilsGaussian(
+            enduranceTable[config.cellType], 
             DZ_PAGE_PE_CYCLE_COUNT_STDDEV_RATIO 
-                * peCycleCountTable[config.cellType]
+                * enduranceTable[config.cellType]
         );
+
+        if (config.endurancePenalty < 0.0) config.endurancePenalty = 0.0;
+
+        pageMetadata->maxPeCycles = (dzU32) (config.endurancePenalty
+                                           * pageMetadata->maxPeCycles);
 
         // clang-format on
 
-        if (config.peCycleCountPenalty < 0.0) config.peCycleCountPenalty = 0.0;
-
-        pageMetadata->peCycleCount = (dzU32) (config.peCycleCountPenalty
-                                              * pageMetadata->peCycleCount);
+        pageMetadata->endurance = pageMetadata->maxPeCycles;
     }
 
     return DZ_RESULT_OK;
+}
+
+/* Returns the maximum P/E cycles of a page. */
+dzU32 dzPageGetMaxPeCycles(const dzByte *pagePtr, dzU32 pageSizeInBytes) {
+    if (pagePtr == NULL || pageSizeInBytes == 0U) return 0U;
+
+    dzPageMetadata *pageMetadata = (dzPageMetadata *) (pagePtr
+                                                       + pageSizeInBytes);
+
+    return pageMetadata->maxPeCycles;
 }
 
 /* Returns the size of `dzPageMetadata`. */
@@ -239,11 +252,10 @@ dzResult dzPageMarkAsFree(dzByte *pagePtr, dzU32 pageSizeInBytes) {
         || pageMetadata->state == DZ_PAGE_STATE_FREE)
         return DZ_RESULT_INVALID_STATE;
 
-    pageMetadata->peCycleCount--;
+    pageMetadata->endurance--;
 
-    pageMetadata->state = (pageMetadata->peCycleCount == 0U)
-                              ? DZ_PAGE_STATE_BAD
-                              : DZ_PAGE_STATE_FREE;
+    pageMetadata->state = (pageMetadata->endurance == 0U) ? DZ_PAGE_STATE_BAD
+                                                          : DZ_PAGE_STATE_FREE;
 
     return DZ_RESULT_OK;
 }

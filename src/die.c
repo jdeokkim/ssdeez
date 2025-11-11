@@ -62,8 +62,8 @@ struct dzDieMetadata_ {
     dzU64 blockCountPerDie;
     dzU64 pageCountPerDie;
     dzU64 pageCountPerPlane;
-    dzU64 physicalBlockSize;
-    dzU64 physicalPageSize;
+    dzU32 physicalBlockSize;
+    dzU32 physicalPageSize;
 };
 
 /* A structure that represents various statistics of a NAND flash die. */
@@ -229,10 +229,18 @@ void dzDieDeinit(dzDie *die) {
     free(die->metadata.planes), free(die->buffer), free(die);
 }
 
+/* Returns the configuration of `die`. */
+dzDieConfig dzDieGetConfig(const dzDie *die) {
+    return (die != NULL) ? die->config
+                         : (dzDieConfig) { .dieId = DZ_DIE_INVALID_ID };
+}
+
 /* Returns the size of `dzDie`. */
 dzUSize dzDieGetStructSize(void) {
     return sizeof(dzDie);
 }
+
+/* ========================================================================> */
 
 /* Returns the total number of blocks in `die`. */
 dzU64 dzDieGetBlockCount(const dzDie *die) {
@@ -252,6 +260,8 @@ dzBlockState dzDieGetBlockState(const dzDie *die, dzPBA pba) {
 
     return dzBlockGetState(blockMetadata);
 }
+
+/* ========================================================================> */
 
 /* Returns the first physical block address within `die`. */
 dzPBA dzDieGetFirstPBA(const dzDie *die) {
@@ -301,6 +311,24 @@ dzPPA dzDieGetNextPPA(const dzDie *die, dzPPA ppa) {
                                                         : dzDieGetInvalidPPA();
 }
 
+/* ========================================================================> */
+
+/* Returns the maximum P/E cycles among all pages within `die`. */
+dzU32 dzDieGetMaxPeCycles(const dzDie *die) {
+    if (die == NULL) return 0U;
+
+    dzU32 result = 0U;
+
+    dzDieForEachPage(die->buffer, die->metadata, pagePtr) {
+        dzU32 maxPeCycles = dzPageGetMaxPeCycles(pagePtr,
+                                                 die->config.pageSizeInBytes);
+
+        if (result < maxPeCycles) result = maxPeCycles;
+    }
+
+    return result;
+}
+
 /* Returns the total number of pages in `die`. */
 dzU64 dzDieGetPageCount(const dzDie *die) {
     return (die != NULL) ? die->metadata.pageCountPerDie : 0U;
@@ -316,6 +344,8 @@ dzPageState dzDieGetPageState(const dzDie *die, dzPPA ppa) {
     return dzPageGetState(pagePtr, die->config.pageSizeInBytes);
 }
 
+/* ========================================================================> */
+
 /* Returns the total number of 'program' operations performed on `die`. */
 dzU64 dzDieGetTotalProgramCount(const dzDie *die) {
     return (die != NULL) ? die->stats.totalProgramCount : 0U;
@@ -330,6 +360,8 @@ dzU64 dzDieGetTotalReadCount(const dzDie *die) {
 dzU64 dzDieGetTotalEraseCount(const dzDie *die) {
     return (die != NULL) ? die->stats.totalEraseCount : 0U;
 }
+
+/* ========================================================================> */
 
 /* Writes `src.ptr` to the page corresponding to `ppa` in `die`. */
 dzResult dzDieProgramPage(dzDie *die, dzPPA ppa, dzByteArray src) {
@@ -607,7 +639,7 @@ static dzByte *dzDieCreateBuffer(dzDieConfig config, dzDieMetadata metadata) {
     dzU64 pageIndex = 0U, centerPageIndex = metadata.pageCountPerDie >> 1U;
 
     dzDieForEachPage(result, metadata, pagePtr) {
-        dzF64 peCycleCountPenalty = 1.0;
+        dzF64 endurancePenalty = 1.0;
 
         // NOTE: Pages in the top and bottom layers should have lower endurance
         if (metadata.pageCountPerDie >= 2U) {
@@ -618,8 +650,7 @@ static dzByte *dzDieCreateBuffer(dzDieConfig config, dzDieMetadata metadata) {
             dzF64 penaltyScale = ((dzF64) distanceFromCenter
                                   / (dzF64) centerPageIndex);
 
-            peCycleCountPenalty -= (penaltyScale
-                                    * DZ_PAGE_PE_CYCLE_COUNT_MAX_PENALTY);
+            endurancePenalty -= (penaltyScale * DZ_PAGE_ENDURANCE_MAX_PENALTY);
         }
 
         dzPPA physicalPageAddress = {
@@ -632,7 +663,7 @@ static dzByte *dzDieCreateBuffer(dzDieConfig config, dzDieMetadata metadata) {
         };
 
         dzPageConfig pageConfig = { .physicalPageAddress = physicalPageAddress,
-                                    .peCycleCountPenalty = peCycleCountPenalty,
+                                    .endurancePenalty = endurancePenalty,
                                     .pageSizeInBytes = config.pageSizeInBytes,
                                     .cellType = config.cellType };
 
@@ -748,7 +779,7 @@ static bool dzDieInitMetadata(dzDie *die) {
                                       / die->config.planeCountPerDie;
 
     die->metadata.physicalPageSize = die->config.pageSizeInBytes
-                                     + dzPageGetMetadataSize();
+                                     + (dzU32) dzPageGetMetadataSize();
 
     die->metadata.physicalBlockSize = die->config.pageCountPerBlock
                                       * die->metadata.physicalPageSize;
