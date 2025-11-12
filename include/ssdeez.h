@@ -77,7 +77,7 @@ extern "C" {
     Maximum penalty factor applied to the maximum number of 
     P/E cycles per page, for each layer in a block.
 */
-#define DZ_PAGE_ENDURANCE_MAX_PENALTY          0.25
+#define DZ_PAGE_PE_CYCLES_MAX_PENALTY          0.25
 
 /*
     Specifies the standard deviation ratio for initializing 
@@ -298,6 +298,12 @@ void dzBlockDeinitMetadata(dzBlockMetadata *metadata);
 /* Returns the size of `dzBlockMetadata`. */
 dzUSize dzBlockGetMetadataSize(void);
 
+/* ========================================================================> */
+
+/* Returns the maximum erase latency of a block, in milliseconds. */
+dzResult dzBlockGetMaxEraseLatency(const dzBlockMetadata *metadata,
+                                   dzF64 *tBERS);
+
 /* Writes the next page identifier of a block to `nextPageId`. */
 dzResult dzBlockGetNextPageId(dzBlockMetadata *metadata, dzU64 *nextPageId);
 
@@ -313,6 +319,8 @@ dzU64 dzBlockGetTotalEraseCount(const dzBlockMetadata *metadata);
 /* Returns the number of valid pages in a block. */
 dzU64 dzBlockGetValidPageCount(const dzBlockMetadata *metadata);
 
+/* ========================================================================> */
+
 /* Advances the next page identifier of a block. */
 dzResult dzBlockAdvanceNextPageId(dzBlockMetadata *metadata);
 
@@ -323,13 +331,15 @@ dzResult dzBlockMarkAsActive(dzBlockMetadata *metadata);
 dzResult dzBlockMarkAsBad(dzBlockMetadata *metadata);
 
 /* Marks a block as free. */
-dzResult dzBlockMarkAsFree(dzBlockMetadata *metadata, dzF64 *eraseLatency);
+dzResult dzBlockMarkAsFree(dzBlockMetadata *metadata, dzF64 *tBERS);
 
 /* Marks a block as reserved. */
 dzResult dzBlockMarkAsReserved(dzBlockMetadata *metadata);
 
 /* Marks a block as unknown. */
 dzResult dzBlockMarkAsUnknown(dzBlockMetadata *metadata);
+
+/* ========================================================================> */
 
 /* Updates the state of the given page within a block's page state map. */
 dzResult dzBlockUpdatePageStateMap(dzBlockMetadata *metadata,
@@ -369,6 +379,9 @@ dzU64 dzDieGetBlockCount(const dzDie *die);
 /* Returns the current state of the block corresponding to `pba` in `die`. */
 dzBlockState dzDieGetBlockState(const dzDie *die, dzPBA pba);
 
+/* Returns the maximum erase latency among all blocks within `die`. */
+dzF64 dzDieGetMaxEraseLatency(const dzDie *die);
+
 /* ========================================================================> */
 
 /* Returns the first physical block address within `die`. */
@@ -387,6 +400,12 @@ dzPPA dzDieGetNextPPA(const dzDie *die, dzPPA ppa);
 
 /* Returns the maximum P/E cycles among all pages within `die`. */
 dzU32 dzDieGetMaxPeCycles(const dzDie *die);
+
+/* Returns the maximum program latency of `die`, in milliseconds. */
+dzF64 dzDieGetMaxProgramLatency(const dzDie *die);
+
+/* Returns the maximum read latency of `die`, in milliseconds. */
+dzF64 dzDieGetMaxReadLatency(const dzDie *die);
 
 /* Returns the total number of pages in `die`. */
 dzU64 dzDieGetPageCount(const dzDie *die);
@@ -443,16 +462,30 @@ dzU32 dzPageGetMaxPeCycles(const dzByte *pagePtr, dzU32 pageSizeInBytes);
 /* Returns the size of `dzPageMetadata`. */
 dzUSize dzPageGetMetadataSize(void);
 
+/* ========================================================================> */
+
 /* Returns the physical page address of a page. */
 dzPPA dzPageGetPPA(const dzByte *pagePtr, dzU32 pageSizeInBytes);
 
 /* Returns the current state of a page. */
 dzPageState dzPageGetState(const dzByte *pagePtr, dzU32 pageSizeInBytes);
 
-/* Returns the read latency of a page. */
+/* Returns the read latency of a page, in milliseconds. */
 dzResult dzPageGetReadLatency(const dzByte *pagePtr,
                               dzU32 pageSizeInBytes,
-                              dzF64 *readLatency);
+                              dzF64 *tR);
+
+/* Returns the maximum program latency of a page, in milliseconds. */
+dzResult dzPageGetMaxProgramLatency(const dzByte *pagePtr,
+                                    dzU32 pageSizeInBytes,
+                                    dzF64 *tPROG);
+
+/* Returns the maximum read latency of a page, in milliseconds. */
+dzResult dzPageGetMaxReadLatency(const dzByte *pagePtr,
+                                 dzU32 pageSizeInBytes,
+                                 dzF64 *tR);
+
+/* ========================================================================> */
 
 /* Returns `true` if the given page is factory-bad. */
 dzBool dzPageIsFactoryBad(dzByte *pagePtr, dzU32 pageSizeInBytes);
@@ -472,7 +505,7 @@ dzResult dzPageMarkAsUnknown(dzByte *pagePtr, dzU32 pageSizeInBytes);
 /* Marks a page as valid. */
 dzResult dzPageMarkAsValid(dzByte *pagePtr,
                            dzU32 pageSizeInBytes,
-                           dzF64 *programLatency);
+                           dzF64 *tPROG);
 
 /* <---------------------------------------------------------- [src/plane.c] */
 
@@ -482,11 +515,13 @@ dzResult dzPlaneInitMetadata(dzPlaneMetadata *metadata, dzPlaneConfig config);
 /* De-initializes the plane `metadata`. */
 void dzPlaneDeinitMetadata(dzPlaneMetadata *metadata);
 
-/* Returns the identifier of the least worn block within a plane. */
-dzU64 dzPlaneGetLeastWornBlockId(const dzPlaneMetadata *metadata);
-
 /* Returns the size of `dzPlaneMetadata`. */
 dzUSize dzPlaneGetMetadataSize(void);
+
+/* ========================================================================> */
+
+/* Returns the identifier of the least worn block within a plane. */
+dzU64 dzPlaneGetLeastWornBlockId(const dzPlaneMetadata *metadata);
 
 /* Updates the state of the given block within a plane's block state map. */
 dzResult dzPlaneUpdateBlockStateMap(dzPlaneMetadata *metadata,
@@ -519,6 +554,11 @@ dzU64 dzUtilsRandRange(dzU64 min, dzU64 max);
 dzF64 dzUtilsRandRangeF64(dzF64 min, dzF64 max);
 
 /* ========================================================================> */
+
+/* Returns `value` clamped to the inclusive range of `low` and `high`. */
+DZ_API_INLINE dzF64 dzUtilsClampF64(dzF64 value, dzF64 low, dzF64 high) {
+    return (value >= low) ? ((value <= high) ? value : high) : low;
+}
 
 /* Returns `true` if `pba1` equals to `pba2`. */
 DZ_API_INLINE bool dzUtilsPBAEquals(dzPBA pba1, dzPBA pba2) {

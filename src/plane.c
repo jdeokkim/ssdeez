@@ -89,15 +89,17 @@ void dzPlaneDeinitMetadata(dzPlaneMetadata *metadata) {
     free(metadata->blockStateMap);
 }
 
+/* Returns the size of `dzPlaneMetadata`. */
+dzUSize dzPlaneGetMetadataSize(void) {
+    return sizeof(dzPlaneMetadata);
+}
+
+/* ========================================================================> */
+
 /* Returns the identifier of the least worn block within a plane. */
 dzU64 dzPlaneGetLeastWornBlockId(const dzPlaneMetadata *metadata) {
     return (metadata != NULL) ? metadata->leastWornBlockId
                               : DZ_BLOCK_INVALID_ID;
-}
-
-/* Returns the size of `dzPlaneMetadata`. */
-dzUSize dzPlaneGetMetadataSize(void) {
-    return sizeof(dzPlaneMetadata);
 }
 
 /* Updates the state of the given block within a plane's block state map. */

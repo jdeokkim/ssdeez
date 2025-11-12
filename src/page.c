@@ -39,22 +39,24 @@ struct dzPageMetadata_ {
     dzU64 totalReadCount;
     // dzF64 lastProgramTime;
     // dzF64 lastReadTime;
+    dzF64 maxProgramLatency;
+    dzF64 maxReadLatency;
     dzU32 maxPeCycles;
-    dzU32 endurance;
+    dzU32 peCycles;
     dzCellType cellType;
 };
 
 /* Constants ==============================================================> */
 
 /* Average numbers of P/E cycles per page, for each cell type. */
-static const dzU32 enduranceTable[DZ_CELL_TYPE_COUNT_] = {
+static const dzU32 peCyclesTable[DZ_CELL_TYPE_COUNT_] = {
     [DZ_CELL_TYPE_SLC] = 85000U,
     [DZ_CELL_TYPE_MLC] = 19000U,
     [DZ_CELL_TYPE_TLC] = 2250U,
     [DZ_CELL_TYPE_QLC] = 750U
 };
 
-/* Average 'program' latencies for each cell type, in miliseconds. */
+/* Average 'program' latencies for each cell type, in milliseconds. */
 static const dzF64 programLatencyTable[DZ_CELL_TYPE_COUNT_] = {
     [DZ_CELL_TYPE_SLC] = 0.85,
     [DZ_CELL_TYPE_MLC] = 2.25,
@@ -62,7 +64,7 @@ static const dzF64 programLatencyTable[DZ_CELL_TYPE_COUNT_] = {
     [DZ_CELL_TYPE_QLC] = 5.25
 };
 
-/* Average 'read' latencies for each cell type, in miliseconds. */
+/* Average 'read' latencies for each cell type, in milliseconds. */
 static const dzF64 readLatencyTable[DZ_CELL_TYPE_COUNT_] = {
     [DZ_CELL_TYPE_SLC] = 0.015,
     [DZ_CELL_TYPE_MLC] = 0.035,
@@ -76,8 +78,6 @@ static const dzF64 readLatencyTable[DZ_CELL_TYPE_COUNT_] = {
 const dzU64 DZ_PAGE_INVALID_ID = UINT64_MAX;
 
 /* Private Variables ======================================================> */
-
-// TODO: ...
 
 /* Private Function Prototypes ============================================> */
 
@@ -112,12 +112,28 @@ dzResult dzPageInitMetadata(dzByte *pagePtr, dzPageConfig config) {
     }
 
     {
+        dzF64 programLatencyMu = programLatencyTable[pageMetadata->cellType];
+        dzF64 programLatencySigma = DZ_PAGE_PROGRAM_LATENCY_STDDEV_RATIO
+                                    * programLatencyMu;
+
+        pageMetadata->maxProgramLatency = programLatencyMu
+                                          + (3.0 * programLatencySigma);
+
+        dzF64 readLatencyMu = readLatencyTable[pageMetadata->cellType];
+        dzF64 readLatencySigma = DZ_PAGE_READ_LATENCY_STDDEV_RATIO
+                                 * readLatencyMu;
+
+        pageMetadata->maxReadLatency = readLatencyMu
+                                       + (3.0 * readLatencySigma);
+    }
+
+    {
         // clang-format off
 
         pageMetadata->maxPeCycles = (dzU32) dzUtilsGaussian(
-            enduranceTable[config.cellType], 
+            peCyclesTable[config.cellType], 
             DZ_PAGE_PE_CYCLE_COUNT_STDDEV_RATIO 
-                * enduranceTable[config.cellType]
+                * peCyclesTable[config.cellType]
         );
 
         if (config.endurancePenalty < 0.0) config.endurancePenalty = 0.0;
@@ -127,7 +143,7 @@ dzResult dzPageInitMetadata(dzByte *pagePtr, dzPageConfig config) {
 
         // clang-format on
 
-        pageMetadata->endurance = pageMetadata->maxPeCycles;
+        pageMetadata->peCycles = pageMetadata->maxPeCycles;
     }
 
     return DZ_RESULT_OK;
@@ -147,6 +163,8 @@ dzU32 dzPageGetMaxPeCycles(const dzByte *pagePtr, dzU32 pageSizeInBytes) {
 dzUSize dzPageGetMetadataSize(void) {
     return sizeof(dzPageMetadata);
 }
+
+/* ========================================================================> */
 
 /* Returns the physical page address of a page. */
 dzPPA dzPageGetPPA(const dzByte *pagePtr, dzU32 pageSizeInBytes) {
@@ -173,11 +191,11 @@ dzPageState dzPageGetState(const dzByte *pagePtr, dzU32 pageSizeInBytes) {
     return pageMetadata->state;
 }
 
-/* Returns the read latency of a page. */
+/* Returns the read latency of a page, in milliseconds. */
 dzResult dzPageGetReadLatency(const dzByte *pagePtr,
                               dzU32 pageSizeInBytes,
-                              dzF64 *readLatency) {
-    if (pagePtr == NULL || pageSizeInBytes == 0U || readLatency == NULL)
+                              dzF64 *tR) {
+    if (pagePtr == NULL || pageSizeInBytes == 0U || tR == NULL)
         return DZ_RESULT_INVALID_ARGUMENT;
 
     dzPageMetadata *pageMetadata = (dzPageMetadata *) (pagePtr
@@ -185,13 +203,51 @@ dzResult dzPageGetReadLatency(const dzByte *pagePtr,
 
     pageMetadata->totalReadCount++;
 
-    *readLatency =
-        dzUtilsGaussian(readLatencyTable[pageMetadata->cellType],
-                        DZ_PAGE_READ_LATENCY_STDDEV_RATIO
-                            * readLatencyTable[pageMetadata->cellType]);
+    {
+        dzF64 rawLatency =
+            dzUtilsGaussian(readLatencyTable[pageMetadata->cellType],
+                            DZ_PAGE_READ_LATENCY_STDDEV_RATIO
+                                * readLatencyTable[pageMetadata->cellType]);
+
+        dzF64 maxLatency = pageMetadata->maxReadLatency;
+
+        *tR = dzUtilsClampF64(rawLatency, 0.01, maxLatency);
+    }
 
     return DZ_RESULT_OK;
 }
+
+/* Returns the maximum program latency of a page, in milliseconds. */
+dzResult dzPageGetMaxProgramLatency(const dzByte *pagePtr,
+                                    dzU32 pageSizeInBytes,
+                                    dzF64 *tPROG) {
+    if (pagePtr == NULL || pageSizeInBytes == 0U || tPROG == NULL)
+        return DZ_RESULT_INVALID_ARGUMENT;
+
+    dzPageMetadata *pageMetadata = (dzPageMetadata *) (pagePtr
+                                                       + pageSizeInBytes);
+
+    *tPROG = pageMetadata->maxProgramLatency;
+
+    return DZ_RESULT_OK;
+}
+
+/* Returns the maximum read latency of a page, in milliseconds. */
+dzResult dzPageGetMaxReadLatency(const dzByte *pagePtr,
+                                 dzU32 pageSizeInBytes,
+                                 dzF64 *tR) {
+    if (pagePtr == NULL || pageSizeInBytes == 0U || tR == NULL)
+        return DZ_RESULT_INVALID_ARGUMENT;
+
+    dzPageMetadata *pageMetadata = (dzPageMetadata *) (pagePtr
+                                                       + pageSizeInBytes);
+
+    *tR = pageMetadata->maxReadLatency;
+
+    return DZ_RESULT_OK;
+}
+
+/* ========================================================================> */
 
 /* Returns `true` if the given page is factory-bad. */
 dzBool dzPageIsFactoryBad(dzByte *pagePtr, dzU32 pageSizeInBytes) {
@@ -252,10 +308,10 @@ dzResult dzPageMarkAsFree(dzByte *pagePtr, dzU32 pageSizeInBytes) {
         || pageMetadata->state == DZ_PAGE_STATE_FREE)
         return DZ_RESULT_INVALID_STATE;
 
-    pageMetadata->endurance--;
+    pageMetadata->peCycles--;
 
-    pageMetadata->state = (pageMetadata->endurance == 0U) ? DZ_PAGE_STATE_BAD
-                                                          : DZ_PAGE_STATE_FREE;
+    pageMetadata->state = (pageMetadata->peCycles == 0U) ? DZ_PAGE_STATE_BAD
+                                                         : DZ_PAGE_STATE_FREE;
 
     return DZ_RESULT_OK;
 }
@@ -276,8 +332,8 @@ dzResult dzPageMarkAsUnknown(dzByte *pagePtr, dzU32 pageSizeInBytes) {
 /* Marks a page as valid. */
 dzResult dzPageMarkAsValid(dzByte *pagePtr,
                            dzU32 pageSizeInBytes,
-                           dzF64 *programLatency) {
-    if (pagePtr == NULL || pageSizeInBytes == 0U || programLatency == NULL)
+                           dzF64 *tPROG) {
+    if (pagePtr == NULL || pageSizeInBytes == 0U || tPROG == NULL)
         return DZ_RESULT_INVALID_ARGUMENT;
 
     dzPageMetadata *pageMetadata = (dzPageMetadata *) (pagePtr
@@ -290,10 +346,16 @@ dzResult dzPageMarkAsValid(dzByte *pagePtr,
 
     pageMetadata->state = DZ_PAGE_STATE_VALID;
 
-    *programLatency =
-        dzUtilsGaussian(programLatencyTable[pageMetadata->cellType],
-                        DZ_PAGE_PROGRAM_LATENCY_STDDEV_RATIO
-                            * programLatencyTable[pageMetadata->cellType]);
+    {
+        dzF64 rawLatency =
+            dzUtilsGaussian(programLatencyTable[pageMetadata->cellType],
+                            DZ_PAGE_PROGRAM_LATENCY_STDDEV_RATIO
+                                * programLatencyTable[pageMetadata->cellType]);
+
+        dzF64 maxLatency = pageMetadata->maxProgramLatency;
+
+        *tPROG = dzUtilsClampF64(rawLatency, 0.01, maxLatency);
+    }
 
     return DZ_RESULT_OK;
 }

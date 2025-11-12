@@ -22,6 +22,7 @@
 
 /* Includes ===============================================================> */
 
+#include <math.h>
 #include <string.h>
 
 #include "ssdeez.h"
@@ -36,8 +37,17 @@
 
 /* Constants ==============================================================> */
 
+/* Integrity CRC (Cyclic Redundancy Check) value for the parameter page. */
+static const dzU16 DZ_ONFI_INITIAL_INTEGRITY_CRC = 0x4F4EU;
+
+/* Default pin capacitance for all loads on the I/O bus. */
+static const dzByte DZ_ONFI_IO_PIN_CAPACITANCE = 10U;
+
+/* Minimum change column setup time, in nanoseconds. */
+static const dzU16 DZ_ONFI_MINIMUM_CCS_TIME = 0x00C8U;
+
 /* Minimum number of bytes required to create a valid ONFI parameter page. */
-static const dzUSize DZ_ONFI_PARAMETER_PAGE_MIN_SIZE = 768U;
+static const dzUSize DZ_ONFI_PARAMETER_PAGE_MIN_SIZE = 256U;
 
 /* ONFI revision number which includes support for ONFI version 1.0. */
 static const dzU16 DZ_ONFI_REVISION_NUMBER = 0x0002U;
@@ -104,6 +114,19 @@ DZ_API_STATIC_INLINE void dzOnfiWriteMISection(dzByteStream *dst);
 DZ_API_STATIC_INLINE void dzOnfiWriteMOSection(const dzDie *die,
                                                dzByteStream *dst);
 
+/* 
+    Writes the "Electrical Parameters" section of a parameter page 
+    to `dst->ptr` and advances `dst->offset`.
+*/
+DZ_API_STATIC_INLINE void dzOnfiWriteEPSection(const dzDie *die,
+                                               dzByteStream *dst);
+
+/* 
+    Writes the "Vendor Specific" section of a parameter page 
+    to `dst->ptr` and advances `dst->offset`.
+*/
+DZ_API_STATIC_INLINE void dzOnfiWriteVSSection(dzByteStream *dst);
+
 /* Public Functions =======================================================> */
 
 /* 
@@ -120,8 +143,9 @@ dzResult dzOnfiCreateParameterPage(const dzDie *die, dzByteArray dst) {
     dzOnfiWriteMISection(&dstStream);
 
     dzOnfiWriteMOSection(die, &dstStream);
+    dzOnfiWriteEPSection(die, &dstStream);
 
-    // TODO: ...
+    dzOnfiWriteVSSection(&dstStream);
 
     return DZ_RESULT_OK;
 }
@@ -329,4 +353,71 @@ DZ_API_STATIC_INLINE void dzOnfiWriteMOSection(const dzDie *die,
 
     /* "Reserved" */
     dzOnfiWriteZeroes(dst, 13U);
+}
+
+/* 
+    Writes the "Electrical Parameters" section of a parameter page 
+    to `dst->ptr` and advances `dst->offset`.
+*/
+DZ_API_STATIC_INLINE void dzOnfiWriteEPSection(const dzDie *die,
+                                               dzByteStream *dst) {
+    /* "I/O Pin Capacitance" */
+    dzOnfiWriteByte(dst, DZ_ONFI_IO_PIN_CAPACITANCE);
+
+    /* "Timing Mode Support" */
+
+    // NOTE: Support for Timing Mode 0 should always be present
+    dzOnfiWriteWord(dst, 0x0001U);
+
+    /* "Program Cache Timing Mode Support" */
+
+    // TODO: Implement program cache?
+    dzOnfiWriteWord(dst, 0x0000U);
+
+    {
+        /* "Maximum Page Program Time" */
+
+        dzF64 tPROGus = round(1000.0 * dzDieGetMaxProgramLatency(die));
+
+        dzOnfiWriteWord(dst,
+                        (dzU16) dzUtilsClampF64(tPROGus, 0.01, UINT16_MAX));
+    }
+
+    {
+        /* "Maximum Block Erase Time" */
+
+        dzF64 tBERSus = round(1000.0 * dzDieGetMaxEraseLatency(die));
+
+        dzOnfiWriteWord(dst,
+                        (dzU16) dzUtilsClampF64(tBERSus, 0.01, UINT16_MAX));
+    }
+
+    {
+        /* "Maximum Page Read Time" */
+
+        dzF64 tRus = round(1000.0 * dzDieGetMaxReadLatency(die));
+
+        dzOnfiWriteWord(dst, (dzU16) dzUtilsClampF64(tRus, 0.01, UINT16_MAX));
+    }
+
+    /* "Minimum Change Column Setup Time" */
+    dzOnfiWriteWord(dst, DZ_ONFI_MINIMUM_CCS_TIME);
+
+    /* "Reserved" */
+    dzOnfiWriteZeroes(dst, 23U);
+}
+
+/* 
+    Writes the "Vendor Specific" section of a parameter page 
+    to `dst->ptr` and advances `dst->offset`.
+*/
+DZ_API_STATIC_INLINE void dzOnfiWriteVSSection(dzByteStream *dst) {
+    /* "Vendor-Specific Revision Number" */
+    dzOnfiWriteWord(dst, 0x0001U);
+
+    /* "Vendor-Specific" */
+    dzOnfiWriteZeroes(dst, 88U);
+
+    /* "Integrity CRC" */
+    dzOnfiWriteWord(dst, DZ_ONFI_INITIAL_INTEGRITY_CRC);
 }

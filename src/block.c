@@ -40,6 +40,7 @@ struct dzBlockMetadata_ {
     dzU64 nextPageId;
     dzU64 totalEraseCount;
     // dzF64 lastEraseTime;
+    dzF64 maxEraseLatency;
     dzCellType cellType;
     dzBlockState state;
     // TODO: ...
@@ -94,6 +95,14 @@ dzResult dzBlockInitMetadata(dzBlockMetadata *metadata, dzBlockConfig config) {
         metadata->state = DZ_BLOCK_STATE_FREE;
     }
 
+    {
+        dzF64 eraseLatencyMu = eraseLatencyTable[metadata->cellType];
+        dzF64 eraseLatencySigma = DZ_BLOCK_ERASE_LATENCY_STDDEV_RATIO
+                                  * eraseLatencyMu;
+
+        metadata->maxEraseLatency = eraseLatencyMu + (3.0 * eraseLatencySigma);
+    }
+
     return DZ_RESULT_OK;
 }
 
@@ -107,6 +116,18 @@ void dzBlockDeinitMetadata(dzBlockMetadata *metadata) {
 /* Returns the size of `dzBlockMetadata`. */
 dzUSize dzBlockGetMetadataSize(void) {
     return sizeof(dzBlockMetadata);
+}
+
+/* ========================================================================> */
+
+/* Returns the maximum erase latency of a block, in milliseconds. */
+dzResult dzBlockGetMaxEraseLatency(const dzBlockMetadata *metadata,
+                                   dzF64 *tBERS) {
+    if (metadata == NULL || tBERS == NULL) return DZ_RESULT_INVALID_ARGUMENT;
+
+    *tBERS = metadata->maxEraseLatency;
+
+    return DZ_RESULT_OK;
 }
 
 /* Writes the next page identifier of a block to `nextPageId`. */
@@ -152,6 +173,8 @@ dzU64 dzBlockGetValidPageCount(const dzBlockMetadata *metadata) {
 
     return validPageCount;
 }
+
+/* ========================================================================> */
 
 /* Advances the next page identifier of a block. */
 dzResult dzBlockAdvanceNextPageId(dzBlockMetadata *metadata) {
@@ -199,9 +222,8 @@ dzResult dzBlockMarkAsBad(dzBlockMetadata *metadata) {
 }
 
 /* Marks a block as free. */
-dzResult dzBlockMarkAsFree(dzBlockMetadata *metadata, dzF64 *eraseLatency) {
-    if (metadata == NULL || eraseLatency == NULL)
-        return DZ_RESULT_INVALID_ARGUMENT;
+dzResult dzBlockMarkAsFree(dzBlockMetadata *metadata, dzF64 *tBERS) {
+    if (metadata == NULL || tBERS == NULL) return DZ_RESULT_INVALID_ARGUMENT;
     else if (metadata->state == DZ_BLOCK_STATE_BAD
              || metadata->state == DZ_BLOCK_STATE_FREE) {
         return DZ_RESULT_INVALID_STATE;
@@ -215,10 +237,16 @@ dzResult dzBlockMarkAsFree(dzBlockMetadata *metadata, dzF64 *eraseLatency) {
                DZ_PAGE_STATE_FREE,
                metadata->pageCount);
 
-        *eraseLatency =
-            dzUtilsGaussian(eraseLatencyTable[metadata->cellType],
-                            DZ_BLOCK_ERASE_LATENCY_STDDEV_RATIO
-                                * eraseLatencyTable[metadata->cellType]);
+        {
+            dzF64 rawLatency =
+                dzUtilsGaussian(eraseLatencyTable[metadata->cellType],
+                                DZ_BLOCK_ERASE_LATENCY_STDDEV_RATIO
+                                    * eraseLatencyTable[metadata->cellType]);
+
+            dzF64 maxLatency = metadata->maxEraseLatency;
+
+            *tBERS = dzUtilsClampF64(rawLatency, 0.01, maxLatency);
+        }
 
         return DZ_RESULT_OK;
     }
@@ -245,6 +273,8 @@ dzResult dzBlockMarkAsUnknown(dzBlockMetadata *metadata) {
 
     return DZ_RESULT_OK;
 }
+
+/* ========================================================================> */
 
 /* Updates the state of the given page within a block's page state map. */
 dzResult dzBlockUpdatePageStateMap(dzBlockMetadata *metadata,

@@ -67,6 +67,7 @@ MaxEmptyLinesToKeep: '1'
 NamespaceIndentation: All
 PenaltyBreakAssignment: '160'
 PenaltyBreakBeforeFirstCallParameter: '160'
+PenaltyReturnTypeOnItsOwnLine: '65536'
 PointerAlignment: Right
 ReflowComments: 'false'
 SortIncludes: 'false'

@@ -261,6 +261,18 @@ dzBlockState dzDieGetBlockState(const dzDie *die, dzPBA pba) {
     return dzBlockGetState(blockMetadata);
 }
 
+/* Returns the maximum erase latency among all blocks within `die`. */
+dzF64 dzDieGetMaxEraseLatency(const dzDie *die) {
+    dzF64 result;
+
+    if (die == NULL
+        || dzBlockGetMaxEraseLatency(die->metadata.blocks, &result)
+               != DZ_RESULT_OK)
+        return DBL_MAX;
+
+    return result;
+}
+
 /* ========================================================================> */
 
 /* Returns the first physical block address within `die`. */
@@ -329,6 +341,34 @@ dzU32 dzDieGetMaxPeCycles(const dzDie *die) {
     return result;
 }
 
+/* Returns the maximum program latency of `die`, in milliseconds. */
+dzF64 dzDieGetMaxProgramLatency(const dzDie *die) {
+    dzF64 result;
+
+    if (die == NULL
+        || dzPageGetMaxProgramLatency(die->buffer,
+                                      die->config.pageSizeInBytes,
+                                      &result)
+               != DZ_RESULT_OK)
+        return DBL_MAX;
+
+    return result;
+}
+
+/* Returns the maximum read latency of `die`, in milliseconds. */
+dzF64 dzDieGetMaxReadLatency(const dzDie *die) {
+    dzF64 result;
+
+    if (die == NULL
+        || dzPageGetMaxReadLatency(die->buffer,
+                                   die->config.pageSizeInBytes,
+                                   &result)
+               != DZ_RESULT_OK)
+        return DBL_MAX;
+
+    return result;
+}
+
 /* Returns the total number of pages in `die`. */
 dzU64 dzDieGetPageCount(const dzDie *die) {
     return (die != NULL) ? die->metadata.pageCountPerDie : 0U;
@@ -370,11 +410,6 @@ dzResult dzDieProgramPage(dzDie *die, dzPPA ppa, dzByteArray src) {
     if (pagePtr == NULL || src.ptr == NULL || src.size == 0U)
         return DZ_RESULT_INVALID_ARGUMENT;
 
-    dzU64 blockIndex = (ppa.planeId * die->config.blockCountPerPlane)
-                       + ppa.blockId;
-
-    dzBlockMetadata *blockMetadata = dzDieGetBlockMetadata(die, blockIndex);
-
     {
         dzF64 programLatency = -DBL_MAX;
 
@@ -388,6 +423,11 @@ dzResult dzDieProgramPage(dzDie *die, dzPPA ppa, dzByteArray src) {
         die->stats.totalProgramLatency += programLatency;
         die->stats.totalProgramCount++;
     }
+
+    dzU64 blockIndex = (ppa.planeId * die->config.blockCountPerPlane)
+                       + ppa.blockId;
+
+    dzBlockMetadata *blockMetadata = dzDieGetBlockMetadata(die, blockIndex);
 
     {
         dzU64 nextPageId = DZ_PAGE_INVALID_ID;
@@ -542,11 +582,9 @@ dzResult dzDieEraseBlock(dzDie *die, dzPBA pba) {
             != DZ_RESULT_OK)
             return DZ_RESULT_MAP_UPDATE_FAILED;
 
-        dzU64 blockTotalEraseCount = dzBlockGetTotalEraseCount(blockMetadata);
+        dzU64 totalEraseCount = dzBlockGetTotalEraseCount(blockMetadata);
 
-        if (dzPlaneUpdateLeastWornBlock(planeMetadata,
-                                        pba,
-                                        blockTotalEraseCount)
+        if (dzPlaneUpdateLeastWornBlock(planeMetadata, pba, totalEraseCount)
             != DZ_RESULT_OK)
             return DZ_RESULT_INTERNAL_ERROR;
     }
@@ -650,7 +688,7 @@ static dzByte *dzDieCreateBuffer(dzDieConfig config, dzDieMetadata metadata) {
             dzF64 penaltyScale = ((dzF64) distanceFromCenter
                                   / (dzF64) centerPageIndex);
 
-            endurancePenalty -= (penaltyScale * DZ_PAGE_ENDURANCE_MAX_PENALTY);
+            endurancePenalty -= (penaltyScale * DZ_PAGE_PE_CYCLES_MAX_PENALTY);
         }
 
         dzPPA physicalPageAddress = {
