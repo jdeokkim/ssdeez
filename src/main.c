@@ -25,6 +25,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "external/json.h"
+
 #define OPTPARSE_IMPLEMENTATION
 #include "external/optparse.h"
 
@@ -32,6 +34,7 @@
 
 /* Private Function Prototypes ============================================> */
 
+/* Shows the 'usage' message and terminates this program. */
 static void dzMainShowUsage(char *programName, char *errorMessage);
 
 /* Public Functions =======================================================> */
@@ -43,25 +46,32 @@ int main(int argc, char *argv[]) {
 
     optparse_init(&options, argv);
 
-    int option = -1;
+    // const char *configPath = NULL;
+    // const char *tracePath = NULL;
 
-    while ((option = optparse(&options, "c:t:")) != -1) {
-        switch (option) {
-            case 'c':
-                // TODO: ...
+    {
+        int option = -1;
 
-                break;
+        while ((option = optparse(&options, "c:t:")) != -1) {
+            switch (option) {
+                case 'c':
+                    // configPath = options.optarg;
 
-            case 't':
-                // TODO: ...
+                    break;
 
-                break;
+                case 't':
+                    // tracePath = options.optarg;
 
-            case '?':
-                dzMainShowUsage(argv[0], options.errmsg);
+                    break;
 
-                break;
+                case '?':
+                    dzMainShowUsage(argv[0], options.errmsg);
+
+                    break;
+            }
         }
+
+        if (option < 0) dzMainShowUsage(argv[0], NULL);
     }
 
     // TODO: ...
@@ -71,19 +81,25 @@ int main(int argc, char *argv[]) {
 
 /* Private Functions ======================================================> */
 
+/* Shows the 'usage' message and terminates this program. */
 static void dzMainShowUsage(char *programName, char *errorMessage) {
+    if (programName == NULL) programName = "ssdeez";
+
+    if (errorMessage != NULL)
+        (void) fprintf(stderr, "%s: %s\n\n", programName, errorMessage);
+
     // clang-format off
 
     (void) fprintf(
-        stderr, 
-        "%s: %s\n"
-        "\n"
+        stderr,
         "Usage: %s -c config [-t trace_file]\n"
         "\n"
         "Options:\n"
-        "  -c config    Specify the path to the SSD configuration file\n"
-        "  -t trace     Specify the path to the workload trace file\n",
-        programName, errorMessage, 
+        "  -c config    Specify the path to the configuration file\n"
+        "  -t trace     Specify the path to the workload trace file\n"
+        "\n"
+        "SSDeez v" DZ_API_VERSION 
+        " (https://github.com/jdeokkim/ssdeez)\n",
         programName
     );
 

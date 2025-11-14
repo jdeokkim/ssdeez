@@ -82,8 +82,8 @@ struct dzDie_ {
     dzDieConfig config;
     dzDieStatistics stats;
     dzDieMetadata metadata;
-    // dzByte otpArea[2048];
     dzByte *buffer;
+    dzByte status;
     // TODO: ...
 };
 
@@ -118,6 +118,9 @@ static bool dzDieInitPlaneMetadata(dzDie *die);
 
 /* Initializes a `die` metadata. */
 static bool dzDieInitMetadata(dzDie *die);
+
+/* Writes the contents of the ONFI parameter page to `die`. */
+static bool dzDieProgramParameterPage(dzDie *die);
 
 /* ========================================================================> */
 
@@ -159,7 +162,8 @@ dzResult dzDieInit(dzDie **die, dzDieConfig config) {
         || config.cellType >= DZ_CELL_TYPE_COUNT_
         || config.planeCountPerDie == 0U 
         || config.blockCountPerPlane == 0U
-        || config.pageCountPerBlock == 0U 
+        || config.pageCountPerBlock == 0U
+        || (config.pageCountPerBlock % 32U) != 0U
         || config.pageSizeInBytes == 0U)
         return DZ_RESULT_INVALID_ARGUMENT;
 
@@ -199,6 +203,12 @@ dzResult dzDieInit(dzDie **die, dzDieConfig config) {
         dzDieDeinit(newDie);
 
         return DZ_RESULT_INJECTION_FAILED;
+    }
+
+    if (!dzDieProgramParameterPage(newDie)) {
+        dzDieDeinit(newDie);
+
+        return DZ_RESULT_INTERNAL_ERROR;
     }
 
     *die = newDie;
@@ -281,7 +291,7 @@ dzPBA dzDieGetFirstPBA(const dzDie *die) {
                      .dieId = ((die != NULL) ? die->config.dieId
                                              : DZ_DIE_INVALID_ID),
                      .planeId = ((die != NULL) ? 0U : DZ_PLANE_INVALID_ID),
-                     .blockId = ((die != NULL) ? 0U : DZ_BLOCK_INVALID_ID) };
+                     .blockId = ((die != NULL) ? 1U : DZ_BLOCK_INVALID_ID) };
 }
 
 /* Returns the first physical page address within `die`. */
@@ -290,7 +300,7 @@ dzPPA dzDieGetFirstPPA(const dzDie *die) {
                      .dieId = ((die != NULL) ? die->config.dieId
                                              : DZ_DIE_INVALID_ID),
                      .planeId = ((die != NULL) ? 0U : DZ_PLANE_INVALID_ID),
-                     .blockId = ((die != NULL) ? 0U : DZ_BLOCK_INVALID_ID),
+                     .blockId = ((die != NULL) ? 1U : DZ_BLOCK_INVALID_ID),
                      .pageId = ((die != NULL) ? 0U : DZ_PAGE_INVALID_ID) };
 }
 
@@ -430,11 +440,8 @@ dzResult dzDieProgramPage(dzDie *die, dzPPA ppa, dzByteArray src) {
     dzBlockMetadata *blockMetadata = dzDieGetBlockMetadata(die, blockIndex);
 
     {
-        dzU64 nextPageId = DZ_PAGE_INVALID_ID;
-
         // NOTE: Enforce "Sequential Page Programming"
-        if (dzBlockGetNextPageId(blockMetadata, &nextPageId) != DZ_RESULT_OK
-            || ppa.pageId != nextPageId)
+        if (ppa.pageId != dzBlockGetNextPageId(blockMetadata))
             return DZ_RESULT_INVALID_SEQUENCE;
     }
 
@@ -482,7 +489,8 @@ dzResult dzDieProgramPage(dzDie *die, dzPPA ppa, dzByteArray src) {
 dzResult dzDieReadPage(dzDie *die, dzPPA ppa, dzByteArray dst) {
     dzByte *pagePtr = dzDiePPAToPtr(die, ppa);
 
-    if (pagePtr == NULL || dst.ptr == NULL || dst.size == 0U)
+    if (pagePtr == NULL || dst.ptr == NULL
+        || dst.size < die->config.pageSizeInBytes)
         return DZ_RESULT_INVALID_ARGUMENT;
 
     {
@@ -498,11 +506,21 @@ dzResult dzDieReadPage(dzDie *die, dzPPA ppa, dzByteArray dst) {
         die->stats.totalReadCount++;
     }
 
-    (void) memcpy(dst.ptr,
-                  pagePtr,
-                  ((dst.size < die->config.pageSizeInBytes)
-                       ? dst.size
-                       : die->config.pageSizeInBytes));
+    (void) memcpy(dst.ptr, pagePtr, die->config.pageSizeInBytes);
+
+    return DZ_RESULT_OK;
+}
+
+/* 
+    Reads data from the ONFI parameter page of `die`, 
+    and copies it to `dst.ptr`.
+*/
+dzResult dzDieReadParameterPage(dzDie *die, dzByteArray dst) {
+    if (die == NULL || dst.ptr == NULL
+        || dst.size < die->config.pageSizeInBytes)
+        return DZ_RESULT_INVALID_ARGUMENT;
+
+    (void) memcpy(dst.ptr, die->buffer, die->config.pageSizeInBytes);
 
     return DZ_RESULT_OK;
 }
@@ -841,6 +859,22 @@ static bool dzDieInitMetadata(dzDie *die) {
         if (!dzDieInitPlaneMetadata(die) || !dzDieInitBlockMetadata(die))
             return false;
     }
+
+    return true;
+}
+
+/* Writes the contents of the ONFI parameter page to `die`. */
+static bool dzDieProgramParameterPage(dzDie *die) {
+    if (die == NULL) return false;
+
+    dzByteArray firstPage = { .ptr = die->buffer,
+                              .size = die->config.pageSizeInBytes };
+
+    if (dzOnfiCreateParameterPage(die, firstPage) != DZ_RESULT_OK)
+        return false;
+
+    (void) dzPageMarkAsReserved(die->buffer, die->config.pageSizeInBytes);
+    (void) dzBlockMarkAsReserved(die->metadata.blocks);
 
     return true;
 }

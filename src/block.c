@@ -130,14 +130,9 @@ dzResult dzBlockGetMaxEraseLatency(const dzBlockMetadata *metadata,
     return DZ_RESULT_OK;
 }
 
-/* Writes the next page identifier of a block to `nextPageId`. */
-dzResult dzBlockGetNextPageId(dzBlockMetadata *metadata, dzU64 *nextPageId) {
-    if (metadata == NULL || nextPageId == NULL)
-        return DZ_RESULT_INVALID_ARGUMENT;
-
-    *nextPageId = metadata->nextPageId;
-
-    return DZ_RESULT_OK;
+/* Returns the next page identifier of a block. */
+dzU64 dzBlockGetNextPageId(dzBlockMetadata *metadata) {
+    return (metadata != NULL) ? metadata->nextPageId : DZ_PAGE_INVALID_ID;
 }
 
 /* Returns the physical block address of a block. */

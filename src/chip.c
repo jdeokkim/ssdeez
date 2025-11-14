@@ -34,6 +34,7 @@
 struct dzChip_ {
     dzChipConfig config;
     dzDie **dies;
+    bool isReady;  // R/B#
     // TODO: ...
 };
 
@@ -83,6 +84,8 @@ dzResult dzChipInit(dzChip **chip, dzChipConfig config) {
                 return DZ_RESULT_INTERNAL_ERROR;
             }
         }
+
+        newChip->isReady = true;
     }
 
     *chip = newChip;
@@ -95,7 +98,7 @@ void dzChipDeinit(dzChip *chip) {
     if (chip == NULL) return;
 
     for (dzU32 i = 0; i < chip->config.dieCount; i++)
-        (void) dzDieDeinit(chip->dies[i]);
+        dzDieDeinit(chip->dies[i]);
 
     free(chip->dies), free(chip);
 }

@@ -73,17 +73,14 @@ extern "C" {
 */
 #define DZ_PAGE_OUT_OF_BAND_SIZE_RATIO         0.05
 
-/* 
-    Maximum penalty factor applied to the maximum number of 
-    P/E cycles per page, for each layer in a block.
-*/
+/* Penalty factor applied to the maximum number of P/E cycles per page. */
 #define DZ_PAGE_PE_CYCLES_MAX_PENALTY          0.25
 
 /*
     Specifies the standard deviation ratio for initializing 
     the maximum number of P/E cycles per page.
 */
-#define DZ_PAGE_PE_CYCLE_COUNT_STDDEV_RATIO    0.1
+#define DZ_PAGE_PE_CYCLE_COUNT_STDDEV_RATIO    0.08
 
 /* Specifies the standard deviation ratio for the program latency. */
 #define DZ_PAGE_PROGRAM_LATENCY_STDDEV_RATIO   0.1
@@ -152,16 +149,17 @@ typedef enum dzPageState_ {
     // DZ_PAGE_STATE_INVALID,
     DZ_PAGE_STATE_VALID,
     DZ_PAGE_STATE_BAD,
+    DZ_PAGE_STATE_RESERVED,
     DZ_PAGE_STATE_COUNT_
 } dzPageState;
 
 /* An enumeration that represents the type of a NAND flash cell. */
 typedef enum dzCellType_ {
     DZ_CELL_TYPE_UNKNOWN = -1,
-    DZ_CELL_TYPE_SLC,  // 2 voltage states
-    DZ_CELL_TYPE_MLC,  // 4 voltage states
-    DZ_CELL_TYPE_TLC,  // 8 voltage states
-    DZ_CELL_TYPE_QLC,  // 16 voltage states
+    DZ_CELL_TYPE_SLC,          // 2 voltage states
+    DZ_CELL_TYPE_MLC,          // 4 voltage states
+    DZ_CELL_TYPE_TLC,          // 8 voltage states
+    DZ_CELL_TYPE_QLC,          // 16 voltage states
     DZ_CELL_TYPE_COUNT_
 } dzCellType;
 
@@ -304,8 +302,8 @@ dzUSize dzBlockGetMetadataSize(void);
 dzResult dzBlockGetMaxEraseLatency(const dzBlockMetadata *metadata,
                                    dzF64 *tBERS);
 
-/* Writes the next page identifier of a block to `nextPageId`. */
-dzResult dzBlockGetNextPageId(dzBlockMetadata *metadata, dzU64 *nextPageId);
+/* Returns the next page identifier of a block. */
+dzU64 dzBlockGetNextPageId(dzBlockMetadata *metadata);
 
 /* Returns the physical block address of a block. */
 dzPBA dzBlockGetPBA(const dzBlockMetadata *metadata);
@@ -434,9 +432,15 @@ dzResult dzDieProgramPage(dzDie *die, dzPPA ppa, dzByteArray src);
 
 /* 
     Reads data from the page corresponding to `ppa` in `die`, 
-    copying it to `dst.ptr`. 
+    and copies it to `dst.ptr`. 
 */
 dzResult dzDieReadPage(dzDie *die, dzPPA ppa, dzByteArray dst);
+
+/* 
+    Reads data from the ONFI parameter page of `die`, 
+    and copies it to `dst.ptr`.
+*/
+dzResult dzDieReadParameterPage(dzDie *die, dzByteArray dst);
 
 /* Erases the block corresponding to `pba` in `die`. */
 dzResult dzDieEraseBlock(dzDie *die, dzPBA pba);
@@ -498,6 +502,9 @@ dzResult dzPageMarkAsFactoryBad(dzByte *pagePtr, dzU32 pageSizeInBytes);
 
 /* Marks a page as free. */
 dzResult dzPageMarkAsFree(dzByte *pagePtr, dzU32 pageSizeInBytes);
+
+/* Marks a page as reserved. */
+dzResult dzPageMarkAsReserved(dzByte *pagePtr, dzU32 pageSizeInBytes);
 
 /* Marks a page as unknown. */
 dzResult dzPageMarkAsUnknown(dzByte *pagePtr, dzU32 pageSizeInBytes);

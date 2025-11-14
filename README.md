@@ -36,6 +36,7 @@ I present SSDeez 🥜, A tiny NAND flash-based SSD simulator written in C.
   - [x] "Probablistic" Program/Read Latencies
   - [x] "Program Page" Operation
   - [x] "Read Page" Operation
+  - [x] "Read Parameter Page" Operation
   - [ ] Read Disturbance
 - Block
   - [x] Block States (Free, Active, Bad, etc.)
@@ -55,7 +56,6 @@ I present SSDeez 🥜, A tiny NAND flash-based SSD simulator written in C.
 - Die
   - [x] Factory Bad Block Injection
     - [x] "Spatial Correlation" Model
-  - [ ] One-Time Programmable (OTP) Area
 - Chip (Package)
   - [ ] [Open NAND Flash Interface (ONFI) 1.0](https://onfi.org)
 - Channel

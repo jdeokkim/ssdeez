@@ -46,8 +46,11 @@ static const dzByte DZ_ONFI_IO_PIN_CAPACITANCE = 10U;
 /* Minimum change column setup time, in nanoseconds. */
 static const dzU16 DZ_ONFI_MINIMUM_CCS_TIME = 0x00C8U;
 
-/* Minimum number of bytes required to create a valid ONFI parameter page. */
-static const dzUSize DZ_ONFI_PARAMETER_PAGE_MIN_SIZE = 256U;
+/* Total number of 'redundant' ONFI parameter pages. */
+static const dzU32 DZ_ONFI_REDUNDANT_PARAMETER_PAGE_COUNT = 2U;
+
+/* Size of an ONFI parameter page, in bytes. */
+static const dzUSize DZ_ONFI_PARAMETER_PAGE_SIZE = 256U;
 
 /* ONFI revision number which includes support for ONFI version 1.0. */
 static const dzU16 DZ_ONFI_REVISION_NUMBER = 0x0002U;
@@ -134,18 +137,23 @@ DZ_API_STATIC_INLINE void dzOnfiWriteVSSection(dzByteStream *dst);
     and writes the contents of it to `dst.ptr`.
 */
 dzResult dzOnfiCreateParameterPage(const dzDie *die, dzByteArray dst) {
-    if (dst.ptr == NULL || dst.size < DZ_ONFI_PARAMETER_PAGE_MIN_SIZE)
+    dzU32 totalPageCount = 1U + DZ_ONFI_REDUNDANT_PARAMETER_PAGE_COUNT;
+
+    if (dst.ptr == NULL
+        || dst.size < totalPageCount * DZ_ONFI_PARAMETER_PAGE_SIZE)
         return DZ_RESULT_INVALID_ARGUMENT;
 
-    dzByteStream dstStream = { .ptr = dst.ptr, .size = dst.size };
+    dzByteStream stream = { .ptr = dst.ptr, .size = dst.size };
 
-    dzOnfiWriteRIFSection(&dstStream);
-    dzOnfiWriteMISection(&dstStream);
+    for (dzU32 i = 0U; i < totalPageCount; i++) {
+        dzOnfiWriteRIFSection(&stream);
+        dzOnfiWriteMISection(&stream);
 
-    dzOnfiWriteMOSection(die, &dstStream);
-    dzOnfiWriteEPSection(die, &dstStream);
+        dzOnfiWriteMOSection(die, &stream);
+        dzOnfiWriteEPSection(die, &stream);
 
-    dzOnfiWriteVSSection(&dstStream);
+        dzOnfiWriteVSSection(&stream);
+    }
 
     return DZ_RESULT_OK;
 }

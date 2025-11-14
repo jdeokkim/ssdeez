@@ -110,10 +110,10 @@ TEST dzTestPageOps(void) {
                   dzDieProgramPage(die, ppa, srcBuffer));
     }
 
-    dzByte dstData[sizeof srcData];
+    dzByte dstData[DZ_TEST_PAGE_SIZE_IN_BYTES];
 
     dzByteArray dstBuffer = { .ptr = (dzByte *) dstData,
-                              .size = sizeof dstData };
+                              .size = DZ_TEST_PAGE_SIZE_IN_BYTES };
 
     for (dzPPA ppa = dzDieGetFirstPPA(die); ppa.pageId != DZ_PAGE_INVALID_ID;
          ppa = dzDieGetNextPPA(die, ppa)) {
@@ -125,6 +125,14 @@ TEST dzTestPageOps(void) {
         ASSERT_EQ(DZ_RESULT_OK, dzDieReadPage(die, ppa, dstBuffer));
 
         ASSERT_MEM_EQ(srcBuffer.ptr, dstBuffer.ptr, srcBuffer.size);
+    }
+
+    {
+        const char onfiSignature[] = { 'O', 'N', 'F', 'I' };
+
+        ASSERT_EQ(DZ_RESULT_OK, dzDieReadParameterPage(die, dstBuffer));
+
+        ASSERT_MEM_EQ(onfiSignature, dstBuffer.ptr, sizeof onfiSignature);
     }
 
     PASS();
@@ -182,8 +190,8 @@ TEST dzTestBlockOps(void) {
             ASSERT_EQ(DZ_RESULT_OK, dzDieReadPage(die, ppa, dstBuffer));
 
             // NOTE: Check if all pages have been initialized to `0xFF`
-            for (dzU64 k = 0; k < sizeof dstBuffer; k++)
-                ASSERT_EQ((dzByte) 0xFF, dstBuffer.ptr[k]);
+            for (dzU64 i = 0; i < sizeof dstBuffer; i++)
+                ASSERT_EQ((dzByte) 0xFF, dstBuffer.ptr[i]);
         }
     }
 

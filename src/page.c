@@ -305,13 +305,27 @@ dzResult dzPageMarkAsFree(dzByte *pagePtr, dzU32 pageSizeInBytes) {
                                                        + pageSizeInBytes);
 
     if (pageMetadata->state == DZ_PAGE_STATE_BAD
-        || pageMetadata->state == DZ_PAGE_STATE_FREE)
+        || pageMetadata->state == DZ_PAGE_STATE_FREE
+        || pageMetadata->state == DZ_PAGE_STATE_RESERVED)
         return DZ_RESULT_INVALID_STATE;
 
     pageMetadata->peCycles--;
 
     pageMetadata->state = (pageMetadata->peCycles == 0U) ? DZ_PAGE_STATE_BAD
                                                          : DZ_PAGE_STATE_FREE;
+
+    return DZ_RESULT_OK;
+}
+
+/* Marks a page as reserved. */
+dzResult dzPageMarkAsReserved(dzByte *pagePtr, dzU32 pageSizeInBytes) {
+    if (pagePtr == NULL || pageSizeInBytes == 0U)
+        return DZ_RESULT_INVALID_ARGUMENT;
+
+    dzPageMetadata *pageMetadata = (dzPageMetadata *) (pagePtr
+                                                       + pageSizeInBytes);
+
+    pageMetadata->state = DZ_PAGE_STATE_RESERVED;
 
     return DZ_RESULT_OK;
 }
