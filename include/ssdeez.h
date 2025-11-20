@@ -147,23 +147,23 @@ typedef enum dzDieStatus_ {
 /* ------------------------------------------------------------------------> */
 
 /* An enumeration that represents the ONFI 1.0 command set. */
-typedef enum dzOnfiCommand_ {
-    DZ_ONFI_CMD_BLOCK_ERASE_0 = 0x60,
-    DZ_ONFI_CMD_BLOCK_ERASE_1 = 0xD0,
-    DZ_ONFI_CMD_CHANGE_READ_COLUMN_0 = 0x05,
-    DZ_ONFI_CMD_CHANGE_READ_COLUMN_1 = 0xE0,
-    DZ_ONFI_CMD_CHANGE_WRITE_COLUMN = 0x85,
-    DZ_ONFI_CMD_GET_FEATURES = 0xEE,
-    DZ_ONFI_CMD_PAGE_PROGRAM_0 = 0x80,
-    DZ_ONFI_CMD_PAGE_PROGRAM_1 = 0x10,
-    DZ_ONFI_CMD_READ_0 = 0x00,
-    DZ_ONFI_CMD_READ_1 = 0x30,
-    DZ_ONFI_CMD_READ_ID = 0x90,
-    DZ_ONFI_CMD_READ_PARAMETER_PAGE = 0xEC,
-    DZ_ONFI_CMD_READ_STATUS = 0x70,
-    DZ_ONFI_CMD_RESET = 0xFF,
-    DZ_ONFI_CMD_SET_FEATURES = 0xEF
-} dzOnfiCommand;
+typedef enum dzChipCommand_ {
+    DZ_CHIP_CMD_BLOCK_ERASE_0 = 0x60,
+    DZ_CHIP_CMD_BLOCK_ERASE_1 = 0xD0,
+    DZ_CHIP_CMD_CHANGE_READ_COLUMN_0 = 0x05,
+    DZ_CHIP_CMD_CHANGE_READ_COLUMN_1 = 0xE0,
+    DZ_CHIP_CMD_CHANGE_WRITE_COLUMN = 0x85,
+    DZ_CHIP_CMD_GET_FEATURES = 0xEE,
+    DZ_CHIP_CMD_PAGE_PROGRAM_0 = 0x80,
+    DZ_CHIP_CMD_PAGE_PROGRAM_1 = 0x10,
+    DZ_CHIP_CMD_READ_0 = 0x00,
+    DZ_CHIP_CMD_READ_1 = 0x30,
+    DZ_CHIP_CMD_READ_ID = 0x90,
+    DZ_CHIP_CMD_READ_PARAMETER_PAGE = 0xEC,
+    DZ_CHIP_CMD_READ_STATUS = 0x70,
+    DZ_CHIP_CMD_RESET = 0xFF,
+    DZ_CHIP_CMD_SET_FEATURES = 0xEF
+} dzChipCommand;
 
 /* ------------------------------------------------------------------------> */
 
@@ -231,45 +231,48 @@ dzResult dzChipInit(dzChip **chip, dzChipConfig config);
 /* Releases the memory allocated for `chip`. */
 void dzChipDeinit(dzChip *chip);
 
+/* Writes `data` to `chip`'s I/O bus. */
+void dzChipWrite(dzChip *chip, dzByte data);
+
 /* ------------------------------------------------------------------------> */
 
 /* Returns the state of the "Address Latch Enable" control line in `chip`. */
-dzBool dzChipGetALE(const dzChip *chip);
+dzByte dzChipGetALE(const dzChip *chip);
 
 /* Returns the state of the "Command Latch Enable" control line in `chip`. */
-dzBool dzChipGetCLE(const dzChip *chip);
+dzByte dzChipGetCLE(const dzChip *chip);
 
 /* Returns the state of the "Chip Enable" control line in `chip`. */
-dzBool dzChipGetCE(const dzChip *chip);
+dzByte dzChipGetCE(const dzChip *chip);
 
 /* Returns the state of the "Read Enable" control line in `chip`. */
-dzBool dzChipGetRE(const dzChip *chip);
+dzByte dzChipGetRE(const dzChip *chip);
 
 /* Returns the state of the "Write Enable" control line in `chip`. */
-dzBool dzChipGetWE(const dzChip *chip);
+dzByte dzChipGetWE(const dzChip *chip);
 
 /* Returns the state of the "Ready/Busy" control line in `chip`. */
-dzBool dzChipGetRB(const dzChip *chip);
+dzByte dzChipGetRB(const dzChip *chip);
 
 /* ------------------------------------------------------------------------> */
 
 /* Sets the state of the "Address Latch Enable" control line in `die`. */
-void dzChipSetALE(dzChip *chip, dzBool state);
+void dzChipSetALE(dzChip *chip, dzByte state);
 
 /* Sets the state of the "Command Latch Enable" control line in `chip`. */
-void dzChipSetCLE(dzChip *chip, dzBool state);
+void dzChipSetCLE(dzChip *chip, dzByte state);
 
 /* Sets the state of the "Chip Enable" control line in `chip`. */
-void dzChipSetCE(dzChip *chip, dzBool state);
+void dzChipSetCE(dzChip *chip, dzByte state);
 
 /* Sets the state of the "Read Enable" control line in `chip`. */
-void dzChipSetRE(dzChip *chip, dzBool state);
+void dzChipSetRE(dzChip *chip, dzByte state);
 
 /* Sets the state of the "Write Enable" control line in `chip`. */
-void dzChipSetWE(dzChip *chip, dzBool state);
+void dzChipSetWE(dzChip *chip, dzByte state);
 
 /* Sets the state of the "Write Protect" control line in `chip`. */
-void dzChipSetWP(dzChip *chip, dzBool state);
+void dzChipSetWP(dzChip *chip, dzByte state);
 
 /* <------------------------------------------------------------ [src/die.c] */
 
@@ -278,6 +281,11 @@ dzResult dzDieInit(dzDie **die, dzDieConfig config);
 
 /* Releases the memory allocated for `die`. */
 void dzDieDeinit(dzDie *die);
+
+/* ------------------------------------------------------------------------> */
+
+/* Performs a "Reset" operation on `die`. */
+void dzDieReset(dzDie *die);
 
 /* <----------------------------------------------------------- [src/page.c] */
 

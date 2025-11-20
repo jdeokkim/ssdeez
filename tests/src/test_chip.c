@@ -27,29 +27,36 @@
 
 /* Constants ==============================================================> */
 
-// NOTE: K9F2G08U0M
-static const dzDieConfig dieConfig = { .dieId = 0U,
-                                       .cellType = DZ_CELL_TYPE_SLC,
+// NOTE: MT29F1G08A
+static const dzDieConfig dieConfig = { .cellType = DZ_CELL_TYPE_SLC,
                                        .badBlockRatio = 0.01,
-                                       .planeCountPerDie = 1U,
-                                       .blockCountPerPlane = 2048U,
+                                       .planeCountPerDie = 2U,
+                                       .blockCountPerPlane = 512U,
                                        .pageCountPerBlock = 64U,
-                                       .pageSizeInBytes = 2048U };
+                                       .pageSizeInBytes = 2048 };
 
 /* Private Variables ======================================================> */
 
-static dzDie *die = NULL;
+static dzChipConfig chipConfig = { .dieConfig = dieConfig,
+                                   .chipId = 0U,
+                                   .dieCount = 2U };
+
+static dzChip *chip = NULL;
 
 /* Private Function Prototypes ============================================> */
 
 static void dzTestSetupCb(void *ctx);
 static void dzTestTeardownCb(void *ctx);
 
+TEST dzTestChipOps(void);
+
 /* Public Functions =======================================================> */
 
-SUITE(dzTestDie) {
+SUITE(dzTestChip) {
     SET_SETUP(dzTestSetupCb, NULL);
     SET_TEARDOWN(dzTestTeardownCb, NULL);
+
+    RUN_TEST(dzTestChipOps);
 }
 
 /* Private Functions ======================================================> */
@@ -57,11 +64,30 @@ SUITE(dzTestDie) {
 static void dzTestSetupCb(void *ctx) {
     DZ_API_UNUSED_VARIABLE(ctx);
 
-    (void) dzDieInit(&die, dieConfig);
+    (void) dzChipInit(&chip, chipConfig);
 }
 
 static void dzTestTeardownCb(void *ctx) {
     DZ_API_UNUSED_VARIABLE(ctx);
 
-    dzDieDeinit(die), die = NULL;
+    dzChipDeinit(chip), chip = NULL;
+}
+
+/* ------------------------------------------------------------------------> */
+
+TEST dzTestChipOps(void) {
+    ASSERT_NEQ(chip, NULL);
+
+    {
+        /* Initialization */
+
+        ASSERT_EQ(dzChipGetRB(chip), 0U);
+
+        dzChipSetCE(chip, 0U);
+        dzChipSetCLE(chip, 1U);
+
+        dzChipWrite(chip, DZ_CHIP_CMD_RESET);
+    }
+
+    PASS();
 }

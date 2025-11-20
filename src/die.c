@@ -39,6 +39,14 @@
 
 /* Typedefs ===============================================================> */
 
+/* An enumeration that represents the current state of a NAND flash die. */
+typedef enum dzDieState_ {
+    DZ_DIE_STATE_IDLE,
+    DZ_DIE_STATE_RST_EXECUTE,
+} dzDieState;
+
+/* ------------------------------------------------------------------------> */
+
 /* A structure that represents the metadata of a NAND flash die. */
 typedef struct dzDieMetadata_ {
     dzU64 pageCountPerDie;
@@ -67,6 +75,7 @@ struct dzDie_ {
     dzDieMetadata metadata;
     dzDieConfig config;
     dzByte *buffer;
+    dzDieState state;
     dzByte status;
 };
 
@@ -193,6 +202,7 @@ dzResult dzDieInit(dzDie **die, dzDieConfig config) {
         return DZ_RESULT_INJECTION_FAILED;
     }
 
+    newDie->state = DZ_DIE_STATE_IDLE;
     newDie->status = DZ_DIE_STATUS_RDY;
 
     *die = newDie;
@@ -208,6 +218,13 @@ void dzDieDeinit(dzDie *die) {
 }
 
 /* ------------------------------------------------------------------------> */
+
+/* Performs a "Reset" operation on `die`. */
+void dzDieReset(dzDie *die) {
+    if (die == NULL) return;
+
+    DZ_API_UNIMPLEMENTED();
+}
 
 /* Private Functions ======================================================> */
 

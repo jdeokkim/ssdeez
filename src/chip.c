@@ -32,12 +32,13 @@
 
 /* A structure that represents the control lines of a NAND flash chip. */
 typedef struct dzChipCtrlLines_ {
-    dzBool chipEnable;       // CE# (`false` = ACTIVE)
-    dzBool addrLatchEnable;  // ALE (`true` = ACTIVE)
-    dzBool cmdLatchEnable;   // CLE (`true` = ACTIVE)
-    dzBool readEnable;       // RE# (`false` = ACTIVE)
-    dzBool writeEnable;      // WE# (`false` = ACTIVE)
-    dzBool writeProtect;     // WP# (`false` = ACTIVE)
+    dzByte chipEnable;       // CE# (`0U` = ACTIVE)
+    dzByte addrLatchEnable;  // ALE (`1U` = ACTIVE)
+    dzByte cmdLatchEnable;   // CLE (`1U` = ACTIVE)
+    dzByte readEnable;       // RE# (`0U` = ACTIVE)
+    dzByte writeEnable;      // WE# (`0U` = ACTIVE)
+    dzByte writeProtect;     // WP# (`0U` = ACTIVE)
+    dzByte lockEnable;       // LOCK (`1U` = ACTIVE)
 } dzChipCtrlLines;
 
 /* A structure that represents a NAND flash chip. */
@@ -45,7 +46,7 @@ struct dzChip_ {
     dzChipConfig config;
     dzDie **dies;
     dzChipCtrlLines lines;
-    dzBool readyBusy;  // R/B# (`false` = ACTIVE)
+    dzByte readyBusy;  // R/B# (`0U` = ACTIVE)
     // TODO: ...
 };
 
@@ -85,9 +86,13 @@ struct dzChip_ {
 
 // TODO: dzChipReadUniqueID()
 
-// TODO: dzChipReset()
+/* Performs a "Reset" operation on `chip`. */
+static void dzChipReset(dzChip *chip);
 
 // TODO: dzChipSetFeatures()
+
+/* Performs `command` on `chip`. */
+static void dzChipDecodeCommand(dzChip *chip, dzByte command);
 
 /* Public Functions =======================================================> */
 
@@ -122,14 +127,14 @@ dzResult dzChipInit(dzChip **chip, dzChipConfig config) {
             }
         }
 
-        newChip->lines = (dzChipCtrlLines) { .addrLatchEnable = false,
-                                             .cmdLatchEnable = false,
-                                             .chipEnable = true,
-                                             .readEnable = true,
-                                             .writeEnable = true,
-                                             .writeProtect = true };
+        newChip->lines = (dzChipCtrlLines) { .addrLatchEnable = 0U,
+                                             .cmdLatchEnable = 0U,
+                                             .chipEnable = 1U,
+                                             .readEnable = 1U,
+                                             .writeEnable = 1U,
+                                             .writeProtect = 1U };
 
-        newChip->readyBusy = false;
+        newChip->readyBusy = 0U;
     }
 
     *chip = newChip;
@@ -147,84 +152,125 @@ void dzChipDeinit(dzChip *chip) {
     free(chip->dies), free(chip);
 }
 
+/* Writes `data` to `chip`'s I/O bus. */
+void dzChipWrite(dzChip *chip, dzByte data) {
+    if (chip == NULL || chip->readyBusy
+        || (chip->lines.addrLatchEnable && chip->lines.cmdLatchEnable)
+        || chip->lines.chipEnable || chip->lines.writeEnable)
+        return;
+
+    // dzChipSetWE(chip, 0U), dzChipSetWE(chip, 1U);
+
+    if (chip->lines.addrLatchEnable) {
+        DZ_API_UNIMPLEMENTED();
+    } else if (chip->lines.cmdLatchEnable) {
+        dzChipDecodeCommand(chip, data);
+    } else {
+        DZ_API_UNIMPLEMENTED();
+    }
+}
+
 /* ------------------------------------------------------------------------> */
 
 /* Returns the state of the "Address Latch Enable" control line in `chip`. */
-dzBool dzChipGetALE(const dzChip *chip) {
-    return (chip != NULL) ? chip->lines.addrLatchEnable : false;
+dzByte dzChipGetALE(const dzChip *chip) {
+    return (chip != NULL) ? chip->lines.addrLatchEnable : 0U;
 }
 
 /* Returns the state of the "Command Latch Enable" control line in `chip`. */
-dzBool dzChipGetCLE(const dzChip *chip) {
-    return (chip != NULL) ? chip->lines.cmdLatchEnable : false;
+dzByte dzChipGetCLE(const dzChip *chip) {
+    return (chip != NULL) ? chip->lines.cmdLatchEnable : 0U;
 }
 
 /* Returns the state of the "Chip Enable" control line in `chip`. */
-dzBool dzChipGetCE(const dzChip *chip) {
-    return (chip != NULL) ? chip->lines.chipEnable : true;
+dzByte dzChipGetCE(const dzChip *chip) {
+    return (chip != NULL) ? chip->lines.chipEnable : 1U;
 }
 
 /* Returns the state of the "Read Enable" control line in `chip`. */
-dzBool dzChipGetRE(const dzChip *chip) {
-    return (chip != NULL) ? chip->lines.readEnable : true;
+dzByte dzChipGetRE(const dzChip *chip) {
+    return (chip != NULL) ? chip->lines.readEnable : 1U;
 }
 
 /* Returns the state of the "Write Enable" control line in `chip`. */
-dzBool dzChipGetWE(const dzChip *chip) {
-    return (chip != NULL) ? chip->lines.writeEnable : true;
+dzByte dzChipGetWE(const dzChip *chip) {
+    return (chip != NULL) ? chip->lines.writeEnable : 1U;
 }
 
 /* Returns the state of the "Ready/Busy" control line in `chip`. */
-dzBool dzChipGetRB(const dzChip *chip) {
-    return (chip != NULL) ? chip->readyBusy : true;
+dzByte dzChipGetRB(const dzChip *chip) {
+    return (chip != NULL) ? chip->readyBusy : 1U;
 }
 
 /* ------------------------------------------------------------------------> */
 
 /* Sets the state of the "Address Latch Enable" control line in `chip`. */
-void dzChipSetALE(dzChip *chip, dzBool state) {
+void dzChipSetALE(dzChip *chip, dzByte state) {
     if (chip == NULL) return;
 
-    if (state && chip->lines.cmdLatchEnable)
-        chip->lines.cmdLatchEnable = false;
+    // NOTE: The ALE and CLE signals are mutually exclusive
+    if (state && chip->lines.cmdLatchEnable) chip->lines.cmdLatchEnable = 0U;
 
     chip->lines.addrLatchEnable = state;
 }
 
 /* Sets the state of the "Command Latch Enable" control line in `chip`. */
-void dzChipSetCLE(dzChip *chip, dzBool state) {
+void dzChipSetCLE(dzChip *chip, dzByte state) {
     if (chip == NULL) return;
 
-    if (state && chip->lines.addrLatchEnable)
-        chip->lines.addrLatchEnable = false;
+    // NOTE: The ALE and CLE signals are mutually exclusive
+    if (state && chip->lines.addrLatchEnable) chip->lines.addrLatchEnable = 0U;
 
     chip->lines.cmdLatchEnable = state;
 }
 
 /* Sets the state of the "Chip Enable" control line in `chip`. */
-void dzChipSetCE(dzChip *chip, dzBool state) {
+void dzChipSetCE(dzChip *chip, dzByte state) {
     if (chip == NULL) return;
 
     chip->lines.chipEnable = state;
 }
 
 /* Sets the state of the "Read Enable" control line in `chip`. */
-void dzChipSetRE(dzChip *chip, dzBool state) {
+void dzChipSetRE(dzChip *chip, dzByte state) {
     if (chip == NULL) return;
 
     chip->lines.readEnable = state;
 }
 
 /* Sets the state of the "Write Enable" control line in `chip`. */
-void dzChipSetWE(dzChip *chip, dzBool state) {
+void dzChipSetWE(dzChip *chip, dzByte state) {
     if (chip == NULL) return;
 
     chip->lines.writeEnable = state;
 }
 
 /* Sets the state of the "Write Protect" control line in `chip`. */
-void dzChipSetWP(dzChip *chip, dzBool state) {
+void dzChipSetWP(dzChip *chip, dzByte state) {
     if (chip == NULL) return;
 
     chip->lines.writeProtect = state;
+}
+
+/* Private Functions ======================================================> */
+
+/* Performs `command` on `chip`. */
+static void dzChipDecodeCommand(dzChip *chip, dzByte command) {
+    switch (command) {
+        case DZ_CHIP_CMD_RESET:
+            dzChipReset(chip);
+
+            break;
+
+        default:
+            DZ_API_UNIMPLEMENTED();
+    }
+}
+
+/* ------------------------------------------------------------------------> */
+
+/* Performs a "Reset" operation on `chip`. */
+static void dzChipReset(dzChip *chip) {
+    for (dzByte i = 0U; i < chip->config.dieCount; i++)
+        dzDieReset(chip->dies[i]);
 }
