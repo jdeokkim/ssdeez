@@ -47,12 +47,9 @@ LIBRARY_PATH = lib
 SOURCE_PATH = src
 
 OBJECTS = \
-	${SOURCE_PATH}/block.o  \
 	${SOURCE_PATH}/chip.o   \
 	${SOURCE_PATH}/die.o    \
-	${SOURCE_PATH}/onfi.o   \
 	${SOURCE_PATH}/page.o   \
-	${SOURCE_PATH}/plane.o  \
 	${SOURCE_PATH}/utils.o
 
 TARGET_BIN = ${BINARY_PATH}/${PROJECT_NAME}

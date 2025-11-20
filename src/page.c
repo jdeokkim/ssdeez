@@ -30,7 +30,11 @@
 
 /* Typedefs ===============================================================> */
 
-// TODO: ...
+/* A structure that represents the spare area of a NAND flash page. */
+struct dzPageSpare_ {
+    dzU16 badBlockMarker;
+    // TODO: ...
+};
 
 /* Constants ==============================================================> */
 
@@ -45,5 +49,43 @@
 // TODO: ...
 
 /* Public Functions =======================================================> */
+
+/* Initializes the given `page`. */
+dzResult dzPageInit(dzPage page) {
+    if (page.ptr == NULL || page.size == 0U) return DZ_RESULT_INVALID_ARGUMENT;
+
+    dzPageSpare *spareArea = (dzPageSpare *) (page.ptr + page.size);
+
+    spareArea->badBlockMarker = 0xFFFFU;
+
+    return DZ_RESULT_OK;
+}
+
+/* Returns the size of a NAND flash page's spare area. */
+dzUSize dzPageGetSpareAreaSize(void) {
+    return sizeof(dzPageSpare);
+}
+
+/* Returns `true` if `page` is defective. */
+dzBool dzPageIsDefective(dzPage page) {
+    if ((page.ptr == NULL) || (page.size == 0U)) return true;
+
+    dzPageSpare *spareArea = (dzPageSpare *) (page.ptr + page.size);
+
+    return (spareArea->badBlockMarker == 0x0000U);
+}
+
+/* Marks `page` as defective. */
+dzResult dzPageMarkAsDefective(dzPage page) {
+    if (page.ptr == NULL || page.size == 0U) return DZ_RESULT_INVALID_ARGUMENT;
+
+    dzPageSpare *spareArea = (dzPageSpare *) (page.ptr + page.size);
+
+    spareArea->badBlockMarker = 0x0000U;
+
+    return DZ_RESULT_OK;
+}
+
+/* Private Functions ======================================================> */
 
 // TODO: ...

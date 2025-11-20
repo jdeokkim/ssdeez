@@ -22,28 +22,70 @@
 
 /* Includes ===============================================================> */
 
+#include "greatest.h"
 #include "ssdeez.h"
-
-/* Macros =================================================================> */
-
-// TODO: ...
-
-/* Typedefs ===============================================================> */
-
-// TODO: ...
 
 /* Constants ==============================================================> */
 
-// TODO: ...
+// NOTE: K9F2G08U0M
+static const dzDieConfig dieConfig = { .dieId = 0U,
+                                       .cellType = DZ_CELL_TYPE_SLC,
+                                       .badBlockRatio = 0.01f,
+                                       .planeCountPerDie = 1U,
+                                       .blockCountPerPlane = 2048U,
+                                       .pageCountPerBlock = 64U,
+                                       .pageSizeInBytes = 2048U };
 
 /* Private Variables ======================================================> */
 
-// TODO: ...
+static dzDie *die = NULL;
 
 /* Private Function Prototypes ============================================> */
 
-// TODO: ...
+static void dzTestSetupCb(void *ctx);
+static void dzTestTeardownCb(void *ctx);
+
+TEST dzTestDieCommands(void);
+TEST dzTestDieStats(void);
 
 /* Public Functions =======================================================> */
 
-// TODO: ...
+SUITE(dzTestDie) {
+    SET_SETUP(dzTestSetupCb, NULL);
+    SET_TEARDOWN(dzTestTeardownCb, NULL);
+
+    RUN_TEST(dzTestDieCommands);
+    RUN_TEST(dzTestDieStats);
+}
+
+/* Private Functions ======================================================> */
+
+static void dzTestSetupCb(void *ctx) {
+    DZ_API_UNUSED_VARIABLE(ctx);
+
+    (void) dzDieInit(&die, dieConfig);
+}
+
+static void dzTestTeardownCb(void *ctx) {
+    DZ_API_UNUSED_VARIABLE(ctx);
+
+    dzDieDeinit(die), die = NULL;
+}
+
+/* ========================================================================> */
+
+TEST dzTestDieCommands(void) {
+    ASSERT_NEQ(die, NULL);
+
+    // TODO: ...
+
+    PASS();
+}
+
+TEST dzTestDieStats(void) {
+    ASSERT_NEQ(die, NULL);
+
+    // TODO: ...
+
+    PASS();
+}

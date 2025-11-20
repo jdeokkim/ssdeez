@@ -21,45 +21,9 @@ I present SSDeez 🥜, A tiny NAND flash-based SSD simulator written in C.
 
 <!-- TODO: Cell-to-Cell Inference, Retention Loss, etc. -->
 
-- Page
-  - [ ] Error Correction Code (ECC)
-  - [x] Layer-to-Layer Endurance Variation
-  - [x] Page States (Free, Valid, Bad, etc.)
-  - [ ] Page-Level Statistics
-    - [ ] Last Program Time
-    - [ ] Last Read Time
-    - [x] Total Program Count
-    - [x] Total Read Count
-  - [x] "Program Page" Operation
-  - [x] Physical Page Address (PPA)
-  - [x] "Probablistic" P/E Cycle Counts
-  - [x] "Probablistic" Program/Read Latencies
-  - [x] "Program Page" Operation
-  - [x] "Read Page" Operation
-  - [x] "Read Parameter Page" Operation
-  - [ ] Read Disturbance
-- Block
-  - [x] Block States (Free, Active, Bad, etc.)
-  - [ ] Block-Level Statistics
-    - [ ] Last Erase Time
-    - [x] Page State Bitmap
-    - [x] Total Erase Count
-  - [x] "Erase" Operation
-  - [ ] "Lock/Unlock Blocks" Operations
-  - [x] Physical Block Address (PBA)
-  - [x] "Probablistic" Erase Latencies
-  - [x] Sequential Page Programming
-- Plane
-  - [ ] Plane-Level Statistics
-    - [x] Block State Bitmap
-    - [x] Least Worn Block
 - Die
-  - [x] Factory Bad Block Injection
-    - [x] "Spatial Correlation" Model
-- Chip (Package)
+- Chip
   - [ ] [Open NAND Flash Interface (ONFI) 1.0](https://onfi.org)
-- Channel
-- SSD
 
 ~~TODO: More Features~~
 

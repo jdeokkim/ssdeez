@@ -29,6 +29,7 @@ extern "C" {
 
 /* Includes ==============================================================> */
 
+#include <limits.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -41,7 +42,7 @@ extern "C" {
 
 /* Compiler-specific attribute for a function that must be always-inlined. */
 #ifndef DZ_API_INLINE
-    #ifdef _MSC_VER
+    #if defined(_MSC_VER)
         #define DZ_API_INLINE __forceinline
     #elif defined(__GNUC__)
         #if defined(__STRICT_ANSI__)
@@ -57,23 +58,23 @@ extern "C" {
 #endif  // `DZ_API_INLINE`
 
 /* Prints the "not implemented" message and aborts this program. */
-#define DZ_API_UNIMPLEMENTED()              \
-    do {                                    \
-        fprintf(                            \
-            stderr,                         \
-            __FILE__                        \
-            ":%d: not implemented: %s\n",   \
-            __LINE__, __func__              \
-        );                                  \
-                                            \
-        abort();                            \
-    } while (0)                             \
+#define DZ_API_UNIMPLEMENTED()                 \
+    do {                                       \
+        fprintf(                               \
+            stderr,                            \
+            __FILE__                           \
+            ":%d: not implemented: %s()\n\n",  \
+            __LINE__, __func__                 \
+        );                                     \
+                                               \
+        abort();                               \
+    } while (0)                                \
 
 /* Suppresses the "unused parameter/variable" errors. */
 #define DZ_API_UNUSED_VARIABLE(x)  ((void) (x))
 
 /* Represents the current API version of SSDeez. */
-#define DZ_API_VERSION             "0.0.2"
+#define DZ_API_VERSION             "0.0.1"
 
 /* Macro-defined Constants ================================================> */
 
@@ -83,84 +84,88 @@ extern "C" {
 
 /* Aliases for primitive types. */
 
-typedef bool           dzBool;
+typedef bool dzBool;
 
-typedef unsigned char  dzByte;
+typedef unsigned char dzByte;
 
-typedef ptrdiff_t      dzISize;
-typedef size_t         dzUSize;
+typedef ptrdiff_t dzISize;
+typedef size_t dzUSize;
 
-typedef int16_t        dzI16;
-typedef int32_t        dzI32;
-typedef int64_t        dzI64;
+typedef int16_t dzI16;
+typedef int32_t dzI32;
+typedef int64_t dzI64;
 
-typedef uint16_t       dzU16;
-typedef uint32_t       dzU32;
-typedef uint64_t       dzU64;
+typedef uint16_t dzU16;
+typedef uint32_t dzU32;
+typedef uint64_t dzU64;
 
-typedef float          dzF32;
-typedef double         dzF64;
+typedef float dzF32;
+typedef double dzF64;
 
-/* ========================================================================> */
+/* ------------------------------------------------------------------------> */
 
 /* Represents the identifier of a page, a block, a plane, a die, or a chip. */
-typedef uint64_t       dzID;
+typedef dzU64 dzID;
 
 // clang-format on
 
-/* ========================================================================> */
-
-/* An enumeration that represents the type of a NAND flash cell. */
-typedef enum dzCellType_ {
-    DZ_CELL_UNKNOWN = -1,
-    DZ_CELL_SLC,  // 2 voltage states
-    DZ_CELL_MLC,  // 4 voltage states
-    DZ_CELL_TLC,  // 8 voltage states
-    DZ_CELL_QLC,  // 16 voltage states
-    DZ_CELL_COUNT_
-} dzCellType;
+/* ------------------------------------------------------------------------> */
 
 /* An enumeration that represents the error codes returned by functions. */
 typedef enum dzResult_ {
-    DZ_RES_OK = 0,
-    DZ_RES_INVALID_ARGUMENT,  // Invalid IDs, `NULL` pointers, etc.
-    DZ_RES_OUT_OF_MEMORY,     // `malloc()` or `calloc()` returned `NULL`.
-    DZ_RES_UNKNOWN,           // Oopsie?
-    DZ_RES_COUNT_
+    DZ_RESULT_OK = 0,
+    DZ_RESULT_INJECTION_FAILED,  // Failed to inject bad blocks into a die
+    DZ_RESULT_INVALID_ARGUMENT,  // Invalid IDs, `NULL` pointers, etc.
+    DZ_RESULT_OUT_OF_MEMORY,     // `malloc()` or `calloc()` returned `NULL`
+    DZ_RESULT_UNKNOWN,           // Oopsie?
+    DZ_RESULT_COUNT_
 } dzResult;
 
-/* ========================================================================> */
+/* ------------------------------------------------------------------------> */
 
-/* A structure that represents a NAND flash die. */
-typedef struct dzDie_ dzDie;
+/* An enumeration that represents the type of a NAND flash cell. */
+typedef enum dzCellType_ {
+    DZ_CELL_TYPE_UNKNOWN = -1,
+    DZ_CELL_TYPE_SLC,  // 2 voltage states
+    DZ_CELL_TYPE_MLC,  // 4 voltage states
+    DZ_CELL_TYPE_TLC,  // 8 voltage states
+    DZ_CELL_TYPE_QLC,  // 16 voltage states
+    DZ_CELL_TYPE_COUNT_
+} dzCellType;
 
-/* A structure that represents the configuration of a NAND flash die. */
-typedef struct dzDieConfig_ {
-    dzID dieId;
-    dzCellType cellType;
-    dzF32 badBlockRatio;
-    dzU32 planeCountPerDie;
-    dzU32 blockCountPerPlane;
-    dzU32 pageCountPerBlock;
-    dzU32 pageSizeInBytes;
-} dzDieConfig;
+/* ------------------------------------------------------------------------> */
 
-/* NOTE: Assuming each logical unit (LUN) consists of only one die? */
-typedef dzDie dzLUN;
+/* An enumeration that represents the status bits of a NAND flash die. */
+typedef enum dzDieStatus_ {
+    DZ_DIE_STATUS_FAIL = (1 << 0),
+    DZ_DIE_STATUS_FAILC = (1 << 1),
+    DZ_DIE_STATUS_ARDY = (1 << 5),
+    DZ_DIE_STATUS_RDY = (1 << 6),
+    DZ_DIE_STATUS_WP = (1 << 7)
+} dzDieStatus;
 
-/* ========================================================================> */
+/* ------------------------------------------------------------------------> */
 
-/* A structure that represents a NAND flash chip, also known as a 'target'. */
-typedef struct dzChip_ dzChip;
+/* An enumeration that represents the ONFI 1.0 command set. */
+typedef enum dzOnfiCommand_ {
+    DZ_ONFI_CMD_BLOCK_ERASE_0 = 0x60,
+    DZ_ONFI_CMD_BLOCK_ERASE_1 = 0xD0,
+    DZ_ONFI_CMD_CHANGE_READ_COLUMN_0 = 0x05,
+    DZ_ONFI_CMD_CHANGE_READ_COLUMN_1 = 0xE0,
+    DZ_ONFI_CMD_CHANGE_WRITE_COLUMN = 0x85,
+    DZ_ONFI_CMD_GET_FEATURES = 0xEE,
+    DZ_ONFI_CMD_PAGE_PROGRAM_0 = 0x80,
+    DZ_ONFI_CMD_PAGE_PROGRAM_1 = 0x10,
+    DZ_ONFI_CMD_READ_0 = 0x00,
+    DZ_ONFI_CMD_READ_1 = 0x30,
+    DZ_ONFI_CMD_READ_ID = 0x90,
+    DZ_ONFI_CMD_READ_PARAMETER_PAGE = 0xEC,
+    DZ_ONFI_CMD_READ_STATUS = 0x70,
+    DZ_ONFI_CMD_RESET = 0xFF,
+    DZ_ONFI_CMD_SET_FEATURES = 0xEF
+} dzOnfiCommand;
 
-/* A structure that represents the configuration of a NAND flash chip. */
-typedef struct dzChipConfig_ {
-    dzDieConfig *dieConfig;
-    dzID chipId;
-    dzU32 dieCount;
-} dzChipConfig;
-
-/* ========================================================================> */
+/* ------------------------------------------------------------------------> */
 
 /* A structure that represents a byte array. */
 typedef struct dzByteArray_ {
@@ -175,16 +180,48 @@ typedef struct dzByteStream_ {
     dzUSize offset;
 } dzByteStream;
 
+/* ------------------------------------------------------------------------> */
+
+/* A structure that represents the spare area of a NAND flash page. */
+typedef struct dzPageSpare_ dzPageSpare;
+
+/* A structure that represents a NAND flash page. */
+typedef dzByteArray dzPage;
+
+/* ------------------------------------------------------------------------> */
+
+/* A structure that represents the configuration of a NAND flash die. */
+typedef struct dzDieConfig_ {
+    dzID dieId;
+    dzCellType cellType;
+    dzF64 badBlockRatio;
+    dzU32 planeCountPerDie;
+    dzU32 blockCountPerPlane;
+    dzU32 pageCountPerBlock;
+    dzU32 pageSizeInBytes;
+} dzDieConfig;
+
+/* A structure that represents a NAND flash die. */
+typedef struct dzDie_ dzDie;
+
+/* ------------------------------------------------------------------------> */
+
+/* A structure that represents the configuration of a NAND flash chip. */
+typedef struct dzChipConfig_ {
+    dzDieConfig dieConfig;
+    dzID chipId;
+    dzByte dieCount;
+} dzChipConfig;
+
+/* A structure that represents a NAND flash chip, also known as a 'target'. */
+typedef struct dzChip_ dzChip;
+
 /* Constants ==============================================================> */
 
 /* A constant that represents an invalid identifier. */
 extern const dzID DZ_API_INVALID_ID;
 
 /* Public Functions =======================================================> */
-
-/* <---------------------------------------------------------- [src/block.c] */
-
-// TODO: ...
 
 /* <----------------------------------------------------------- [src/chip.c] */
 
@@ -194,38 +231,45 @@ dzResult dzChipInit(dzChip **chip, dzChipConfig config);
 /* Releases the memory allocated for `chip`. */
 void dzChipDeinit(dzChip *chip);
 
-/* Public Functions =======================================================> */
+/* ------------------------------------------------------------------------> */
 
-// TODO: dzChipBlockErase()
+/* Returns the state of the "Address Latch Enable" control line in `chip`. */
+dzBool dzChipGetALE(const dzChip *chip);
 
-// TODO: dzChipChangeReadColumn()
+/* Returns the state of the "Command Latch Enable" control line in `chip`. */
+dzBool dzChipGetCLE(const dzChip *chip);
 
-// TODO: dzChipChangeWriteColumn()
+/* Returns the state of the "Chip Enable" control line in `chip`. */
+dzBool dzChipGetCE(const dzChip *chip);
 
-// TODO: dzChipCopyback()
+/* Returns the state of the "Read Enable" control line in `chip`. */
+dzBool dzChipGetRE(const dzChip *chip);
 
-// TODO: dzChipGetFeatures()
+/* Returns the state of the "Write Enable" control line in `chip`. */
+dzBool dzChipGetWE(const dzChip *chip);
 
-// TODO: dzChipPageProgram()
+/* Returns the state of the "Ready/Busy" control line in `chip`. */
+dzBool dzChipGetRB(const dzChip *chip);
 
-// TODO: dzChipRead()
+/* ------------------------------------------------------------------------> */
 
-// TODO: dzChipReadCache()
+/* Sets the state of the "Address Latch Enable" control line in `die`. */
+void dzChipSetALE(dzChip *chip, dzBool state);
 
-// TODO: dzChipReadID()
+/* Sets the state of the "Command Latch Enable" control line in `chip`. */
+void dzChipSetCLE(dzChip *chip, dzBool state);
 
-// TODO: dzChipReadParameterPage()
+/* Sets the state of the "Chip Enable" control line in `chip`. */
+void dzChipSetCE(dzChip *chip, dzBool state);
 
-// TODO: dzChipReadStatus()
+/* Sets the state of the "Read Enable" control line in `chip`. */
+void dzChipSetRE(dzChip *chip, dzBool state);
 
-// TODO: dzChipReadStatusEnhanced()
+/* Sets the state of the "Write Enable" control line in `chip`. */
+void dzChipSetWE(dzChip *chip, dzBool state);
 
-// TODO: dzChipReadUniqueID()
-
-/* Performs a "Reset" operation. */
-dzResult dzChipReset(dzChip *chip);
-
-// TODO: dzChipSetFeatures()
+/* Sets the state of the "Write Protect" control line in `chip`. */
+void dzChipSetWP(dzChip *chip, dzBool state);
 
 /* <------------------------------------------------------------ [src/die.c] */
 
@@ -235,17 +279,19 @@ dzResult dzDieInit(dzDie **die, dzDieConfig config);
 /* Releases the memory allocated for `die`. */
 void dzDieDeinit(dzDie *die);
 
-/* <----------------------------------------------------------- [src/onfi.c] */
-
-// TODO: ...
-
 /* <----------------------------------------------------------- [src/page.c] */
 
-// TODO: ...
+/* Initializes the given `page`. */
+dzResult dzPageInit(dzPage page);
 
-/* <---------------------------------------------------------- [src/plane.c] */
+/* Returns the size of a NAND flash page's spare area. */
+dzUSize dzPageGetSpareAreaSize(void);
 
-// TODO: ...
+/* Returns `true` if `page` is defective. */
+dzBool dzPageIsDefective(dzPage page);
+
+/* Marks `page` as defective. */
+dzResult dzPageMarkAsDefective(dzPage page);
 
 /* <---------------------------------------------------------- [src/utils.c] */
 
@@ -281,6 +327,41 @@ DZ_API_INLINE dzF64 dzUtilsClampF64(dzF64 value, dzF64 low, dzF64 high) {
     }
 
     return (value >= low) ? ((value <= high) ? value : high) : low;
+}
+
+/* Returns the number of trailing zero-bits in `x`. */
+DZ_API_INLINE dzU32 dzUtilsCtz(dzU32 x) {
+    if (x == 0U) return UINT32_MAX;
+
+        // clang-format off
+
+#if defined(_MSC_VER)
+    #if defined(__ARM_ARCH)
+        return _CountTrailingZeros(x);
+    #elif defined(__BMI__)
+        return _tzcnt_u32(x);
+    #else
+        dzU32 result;
+
+        return _BitScanForward(&result, x) ? result : UINT32_MAX;
+    #endif
+#elif defined(__GNUC__)
+    return (dzU32) __builtin_ctz(x);
+#else
+    x &= -((dzI32) x);
+
+    dzU32 result = ((sizeof result) << 3U) - 1U;
+
+    if (x & 0x0000FFFFU) result -= 16U;
+    if (x & 0x00FF00FFU) result -= 8U;
+    if (x & 0x0F0F0F0FU) result -= 4U;
+    if (x & 0x33333333U) result -= 2U;
+    if (x & 0x55555555U) result -= 1U;
+
+    return result;
+#endif
+
+    // clang-format on
 }
 
 /* ========================================================================> */

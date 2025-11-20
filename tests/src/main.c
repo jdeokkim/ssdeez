@@ -28,7 +28,7 @@
 /* Public Function Prototypes =============================================> */
 
 // SUITE_EXTERN(dzTestChip);
-// SUITE_EXTERN(dzTestDie);
+SUITE_EXTERN(dzTestDie);
 SUITE_EXTERN(dzTestUtils);
 
 /* Public Functions =======================================================> */
@@ -41,7 +41,7 @@ int main(int argc, char *argv[]) {
     GREATEST_MAIN_BEGIN();
 
     // RUN_SUITE(dzTestChip);
-    // RUN_SUITE(dzTestDie);
+    RUN_SUITE(dzTestDie);
     RUN_SUITE(dzTestUtils);
 
     GREATEST_MAIN_END();
