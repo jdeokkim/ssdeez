@@ -74,6 +74,8 @@ struct dzDie_ {
     dzDieStats stats;
     dzDieMetadata metadata;
     dzDieConfig config;
+    dzTimestamp currentTime;
+    dzTimestamp remainingTime;
     dzByte *buffer;
     dzDieState state;
     dzByte status;
@@ -99,6 +101,39 @@ static const dzU32 tRTable[DZ_CELL_TYPE_COUNT_] = {
     [DZ_CELL_TYPE_QLC] = 85U
 };
 
+/* 
+    Average "reset time" when not performing a "program" 
+    or an "erase" operation, for each cell type, in microseconds. 
+*/
+static const dzU32 tRST0Table[DZ_CELL_TYPE_COUNT_] = {
+    [DZ_CELL_TYPE_SLC] = 5U,
+    [DZ_CELL_TYPE_MLC] = 8U,
+    [DZ_CELL_TYPE_TLC] = 10U,
+    [DZ_CELL_TYPE_QLC] = 12U
+};
+
+/* 
+    Average "reset time" when performing a "program" operation, 
+    for each cell type, in microseconds. 
+*/
+static const dzU32 tRST1Table[DZ_CELL_TYPE_COUNT_] = {
+    [DZ_CELL_TYPE_SLC] = 11U,
+    [DZ_CELL_TYPE_MLC] = 14U,
+    [DZ_CELL_TYPE_TLC] = 18U,
+    [DZ_CELL_TYPE_QLC] = 21U
+};
+
+/* 
+    Average "reset time" when performing an "erase" operation, 
+    for each cell type, in microseconds. 
+*/
+static const dzU32 tRST2Table[DZ_CELL_TYPE_COUNT_] = {
+    [DZ_CELL_TYPE_SLC] = 400U,
+    [DZ_CELL_TYPE_MLC] = 650U,
+    [DZ_CELL_TYPE_TLC] = 725U,
+    [DZ_CELL_TYPE_QLC] = 850U
+};
+
 /* Average "block erase time" for each cell type, in microseconds. */
 static const dzU32 tBERSTable[DZ_CELL_TYPE_COUNT_] = {
     [DZ_CELL_TYPE_SLC] = 2000U,
@@ -116,6 +151,9 @@ static const dzF32 tPROGSigmaRatio = 0.01f;
 
 /* Standard deviation ratio for "page read time". */
 static const dzF32 tRSigmaRatio = 0.025f;
+
+/* Standard deviation ratio for "reset time". */
+static const dzF32 tRSTSigmaRatio = 0.075f;
 
 /* Standard deviation ratio for "block erase time". */
 static const dzF32 tBERSSigmaRatio = 0.05f;
@@ -147,6 +185,11 @@ static bool dzDieIsBlockDefective(dzDie *die, dzID blockIndex);
 
 /* Marks the `blockIndex`-th block within `die` as defective. */
 static bool dzDieMarkBlockAsDefective(dzDie *die, dzID blockIndex);
+
+/* ------------------------------------------------------------------------> */
+
+/* Performs a "Reset" operation on `die`. */
+static void dzDieReset(dzDie *die);
 
 /* Public Functions =======================================================> */
 
@@ -184,6 +227,9 @@ dzResult dzDieInit(dzDie **die, dzDieConfig config) {
 
     newDie->config = config;
 
+    newDie->currentTime = 0U;
+    newDie->remainingTime = 0U;
+
     if (!dzDieInitMetadata(newDie)) {
         dzDieDeinit(newDie);
 
@@ -217,13 +263,64 @@ void dzDieDeinit(dzDie *die) {
     free(die->buffer), free(die);
 }
 
+/* Performs `command` on `die`. */
+void dzDieDecodeCommand(dzDie *die, dzByte command, dzTimestamp ts) {
+    if (die == NULL || die->currentTime >= ts) return;
+
+    dzBool isAcceptableWhileBusy = (command == DZ_CHIP_CMD_READ_STATUS)
+                                   || (command == DZ_CHIP_CMD_RESET);
+
+    if (!isAcceptableWhileBusy && !(die->status & DZ_DIE_STATUS_RDY)) {
+        dzTimestamp elapsedTime = ts - die->currentTime;
+
+        if (elapsedTime < die->remainingTime) {
+            die->state = DZ_DIE_STATE_IDLE;
+
+            dzDieReset(die);
+        }
+
+        die->currentTime = ts;
+
+        return;
+    }
+
+    switch (command) {
+        case DZ_CHIP_CMD_RESET:
+            dzDieReset(die);
+
+            break;
+
+        default:
+            DZ_API_UNIMPLEMENTED();
+    }
+}
+
+/* Waits until the `die`'s "Ready" status bit is set. */
+dzTimestamp dzDieWaitUntilRDY(dzDie *die) {
+    if (die == NULL || die->status & DZ_DIE_STATUS_RDY) return 0U;
+
+    dzTimestamp result = die->remainingTime;
+
+    switch (die->state) {
+        case DZ_DIE_STATE_RST_EXECUTE:
+            dzDieReset(die);
+
+            break;
+
+        default:
+            DZ_API_UNIMPLEMENTED();
+    }
+
+    die->currentTime += result;
+
+    return result;
+}
+
 /* ------------------------------------------------------------------------> */
 
-/* Performs a "Reset" operation on `die`. */
-void dzDieReset(dzDie *die) {
-    if (die == NULL) return;
-
-    DZ_API_UNIMPLEMENTED();
+/* Returns the "Ready" status bit of `die`. */
+dzByte dzDieGetRDY(const dzDie *die) {
+    return (die != NULL) ? !!(die->status & DZ_DIE_STATUS_RDY) : 0U;
 }
 
 /* Private Functions ======================================================> */
@@ -402,4 +499,30 @@ static bool dzDieMarkBlockAsDefective(dzDie *die, dzID blockIndex) {
     if (dzPageMarkAsDefective(lastPage) != DZ_RESULT_OK) return false;
 
     return true;
+}
+
+/* ------------------------------------------------------------------------> */
+
+/* Performs a "Reset" operation on `die`. */
+static void dzDieReset(dzDie *die) {
+    if (die->state != DZ_DIE_STATE_RST_EXECUTE) {
+        die->status &= (dzByte) ~DZ_DIE_STATUS_RDY;
+
+        die->state = DZ_DIE_STATE_RST_EXECUTE;
+
+        // TODO: ...
+        die->remainingTime = (dzU64)
+            dzUtilsGaussian((dzF64) tRST0Table[die->config.cellType],
+                            tRSTSigmaRatio);
+
+        DZ_API_UNUSED_VARIABLE(tRST1Table);
+        DZ_API_UNUSED_VARIABLE(tRST2Table);
+    } else {
+        die->status &= (dzByte) ~(DZ_DIE_STATUS_FAIL | DZ_DIE_STATUS_FAILC);
+        die->status |= DZ_DIE_STATUS_RDY;
+
+        die->state = DZ_DIE_STATE_IDLE;
+
+        die->remainingTime = 0U;
+    }
 }

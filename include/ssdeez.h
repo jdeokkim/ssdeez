@@ -102,9 +102,14 @@ typedef uint64_t dzU64;
 typedef float dzF32;
 typedef double dzF64;
 
+typedef char *dzString;
+
 /* ------------------------------------------------------------------------> */
 
-/* Represents the identifier of a page, a block, a plane, a die, or a chip. */
+/* Timestamp value, in microseconds. */
+typedef dzU64 dzTimestamp;
+
+/* The identifier of a page, a block, a plane, a die, or a chip. */
 typedef dzU64 dzID;
 
 // clang-format on
@@ -162,7 +167,8 @@ typedef enum dzChipCommand_ {
     DZ_CHIP_CMD_READ_PARAMETER_PAGE = 0xEC,
     DZ_CHIP_CMD_READ_STATUS = 0x70,
     DZ_CHIP_CMD_RESET = 0xFF,
-    DZ_CHIP_CMD_SET_FEATURES = 0xEF
+    DZ_CHIP_CMD_SET_FEATURES = 0xEF,
+    DZ_CHIP_CMD_UNKNOWN = 0xFE
 } dzChipCommand;
 
 /* ------------------------------------------------------------------------> */
@@ -193,8 +199,8 @@ typedef dzByteArray dzPage;
 /* A structure that represents the configuration of a NAND flash die. */
 typedef struct dzDieConfig_ {
     dzID dieId;
-    dzCellType cellType;
     dzF64 badBlockRatio;
+    dzCellType cellType;
     dzU32 planeCountPerDie;
     dzU32 blockCountPerPlane;
     dzU32 pageCountPerBlock;
@@ -231,8 +237,11 @@ dzResult dzChipInit(dzChip **chip, dzChipConfig config);
 /* Releases the memory allocated for `chip`. */
 void dzChipDeinit(dzChip *chip);
 
+/* Reads data from `chip`'s I/O bus. */
+void dzChipRead(dzChip *chip, dzByte *data, dzTimestamp ts);
+
 /* Writes `data` to `chip`'s I/O bus. */
-void dzChipWrite(dzChip *chip, dzByte data);
+void dzChipWrite(dzChip *chip, dzByte data, dzTimestamp ts);
 
 /* ------------------------------------------------------------------------> */
 
@@ -244,12 +253,6 @@ dzByte dzChipGetCLE(const dzChip *chip);
 
 /* Returns the state of the "Chip Enable" control line in `chip`. */
 dzByte dzChipGetCE(const dzChip *chip);
-
-/* Returns the state of the "Read Enable" control line in `chip`. */
-dzByte dzChipGetRE(const dzChip *chip);
-
-/* Returns the state of the "Write Enable" control line in `chip`. */
-dzByte dzChipGetWE(const dzChip *chip);
 
 /* Returns the state of the "Ready/Busy" control line in `chip`. */
 dzByte dzChipGetRB(const dzChip *chip);
@@ -265,14 +268,16 @@ void dzChipSetCLE(dzChip *chip, dzByte state);
 /* Sets the state of the "Chip Enable" control line in `chip`. */
 void dzChipSetCE(dzChip *chip, dzByte state);
 
-/* Sets the state of the "Read Enable" control line in `chip`. */
-void dzChipSetRE(dzChip *chip, dzByte state);
-
-/* Sets the state of the "Write Enable" control line in `chip`. */
-void dzChipSetWE(dzChip *chip, dzByte state);
-
 /* Sets the state of the "Write Protect" control line in `chip`. */
 void dzChipSetWP(dzChip *chip, dzByte state);
+
+/* ------------------------------------------------------------------------> */
+
+/* Toggles the state of the "Read Enable" control line in `chip`. */
+void dzChipToggleRE(dzChip *chip);
+
+/* Toggles the state of the "Write Enable" control line in `chip`. */
+void dzChipToggleWE(dzChip *chip);
 
 /* <------------------------------------------------------------ [src/die.c] */
 
@@ -282,10 +287,16 @@ dzResult dzDieInit(dzDie **die, dzDieConfig config);
 /* Releases the memory allocated for `die`. */
 void dzDieDeinit(dzDie *die);
 
+/* Performs `command` on `die`. */
+void dzDieDecodeCommand(dzDie *die, dzByte command, dzTimestamp ts);
+
+/* Waits until the `die`'s "Ready" status bit is set. */
+dzTimestamp dzDieWaitUntilRDY(dzDie *die);
+
 /* ------------------------------------------------------------------------> */
 
-/* Performs a "Reset" operation on `die`. */
-void dzDieReset(dzDie *die);
+/* Returns the "Ready" status bit of `die`. */
+dzByte dzDieGetRDY(const dzDie *die);
 
 /* <----------------------------------------------------------- [src/page.c] */
 

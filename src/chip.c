@@ -30,6 +30,8 @@
 
 /* Typedefs ===============================================================> */
 
+// clang-format off
+
 /* A structure that represents the control lines of a NAND flash chip. */
 typedef struct dzChipCtrlLines_ {
     dzByte chipEnable;       // CE# (`0U` = ACTIVE)
@@ -44,21 +46,35 @@ typedef struct dzChipCtrlLines_ {
 /* A structure that represents a NAND flash chip. */
 struct dzChip_ {
     dzChipConfig config;
+    dzChipCommand command;
+    dzTimestamp currentTime;
+    dzByte address[7], addressCycleCount;  
     dzDie **dies;
     dzChipCtrlLines lines;
-    dzByte readyBusy;  // R/B# (`0U` = ACTIVE)
-    // TODO: ...
+    dzByte isReady;                        // R/B# (`0U` = BUSY)
+    dzUSize offset;                        // R/W Position Indicator
 };
+
+// clang-format on
 
 /* Constants ==============================================================> */
 
-// TODO: ...
+/* ONFI signature bytes. */
+static const dzByte onfiSignature[] = { 'O', 'N', 'F', 'I' };
 
 /* Private Variables ======================================================> */
 
 // TODO: ...
 
 /* Private Function Prototypes ============================================> */
+
+/* Performs `command` on `chip`. */
+static void dzChipDecodeCommand(dzChip *chip, dzByte command, dzTimestamp ts);
+
+/* Writes `address` to `chip`'s address register. */
+static void dzChipWriteAddress(dzChip *chip, dzByte address, dzTimestamp ts);
+
+/* ------------------------------------------------------------------------> */
 
 // TODO: dzChipBlockErase()
 
@@ -72,11 +88,12 @@ struct dzChip_ {
 
 // TODO: dzChipPageProgram()
 
+/* Performs a "Power-On Reset" operation on `chip`. */
+static void dzChipPowerOnReset(dzChip *chip);
+
 // TODO: dzChipRead()
 
 // TODO: dzChipReadCache()
-
-// TODO: dzChipReadID()
 
 // TODO: dzChipReadParameterPage()
 
@@ -87,12 +104,14 @@ struct dzChip_ {
 // TODO: dzChipReadUniqueID()
 
 /* Performs a "Reset" operation on `chip`. */
-static void dzChipReset(dzChip *chip);
+static void dzChipReset(dzChip *chip, dzTimestamp ts);
 
 // TODO: dzChipSetFeatures()
 
-/* Performs `command` on `chip`. */
-static void dzChipDecodeCommand(dzChip *chip, dzByte command);
+/* ------------------------------------------------------------------------> */
+
+/* Returns `1U` if `chip` is ready. */
+DZ_API_STATIC_INLINE dzByte dzChipIsReady(dzChip *chip);
 
 /* Public Functions =======================================================> */
 
@@ -114,9 +133,20 @@ dzResult dzChipInit(dzChip **chip, dzChipConfig config) {
     {
         newChip->config = config;
 
+        newChip->command = DZ_CHIP_CMD_UNKNOWN;
+        newChip->currentTime = 1U;
+
+        dzUSize byteCount = sizeof newChip->address
+                            / sizeof *(newChip->address);
+
+        for (dzUSize i = 0U; i < byteCount; i++)
+            newChip->address[i] = 0U;
+
+        newChip->addressCycleCount = 0U;
+
         newChip->dies = malloc(config.dieCount * sizeof *(newChip->dies));
 
-        for (dzU32 i = 0; i < config.dieCount; i++) {
+        for (dzU32 i = 0U; i < config.dieCount; i++) {
             config.dieConfig.dieId = i;
 
             if (dzDieInit(&(newChip->dies[i]), config.dieConfig)
@@ -134,7 +164,10 @@ dzResult dzChipInit(dzChip **chip, dzChipConfig config) {
                                              .writeEnable = 1U,
                                              .writeProtect = 1U };
 
-        newChip->readyBusy = 0U;
+        newChip->isReady = 1U;
+        newChip->offset = 0U;
+
+        dzChipPowerOnReset(newChip);
     }
 
     *chip = newChip;
@@ -152,54 +185,73 @@ void dzChipDeinit(dzChip *chip) {
     free(chip->dies), free(chip);
 }
 
-/* Writes `data` to `chip`'s I/O bus. */
-void dzChipWrite(dzChip *chip, dzByte data) {
-    if (chip == NULL || chip->readyBusy
-        || (chip->lines.addrLatchEnable && chip->lines.cmdLatchEnable)
-        || chip->lines.chipEnable || chip->lines.writeEnable)
+/* Reads `data` from `chip`'s I/O bus. */
+void dzChipRead(dzChip *chip, dzByte *data, dzTimestamp ts) {
+    if (chip == NULL || chip->lines.chipEnable
+        || chip->lines.readEnable != 0xFFU || data == NULL)
         return;
 
-    // dzChipSetWE(chip, 0U), dzChipSetWE(chip, 1U);
+    switch (chip->command) {
+        case DZ_CHIP_CMD_READ_ID:
+            *data = onfiSignature[chip->offset];
+
+            if (chip->offset < sizeof onfiSignature / sizeof *onfiSignature)
+                chip->offset++;
+
+            break;
+
+        default:
+            DZ_API_UNIMPLEMENTED();
+    }
+
+    chip->currentTime = ts;
+    chip->lines.readEnable = 1U;
+}
+
+/* Writes `data` to `chip`'s I/O bus. */
+void dzChipWrite(dzChip *chip, dzByte data, dzTimestamp ts) {
+    if (chip == NULL || chip->lines.chipEnable
+        || chip->lines.writeEnable != 0xFFU
+        || (chip->lines.addrLatchEnable && chip->lines.cmdLatchEnable))
+        return;
 
     if (chip->lines.addrLatchEnable) {
-        DZ_API_UNIMPLEMENTED();
+        dzChipWriteAddress(chip, data, ts);
     } else if (chip->lines.cmdLatchEnable) {
-        dzChipDecodeCommand(chip, data);
+        dzChipDecodeCommand(chip, data, ts);
     } else {
         DZ_API_UNIMPLEMENTED();
     }
+
+    chip->currentTime = ts;
+    chip->lines.writeEnable = 1U;
 }
 
 /* ------------------------------------------------------------------------> */
 
 /* Returns the state of the "Address Latch Enable" control line in `chip`. */
 dzByte dzChipGetALE(const dzChip *chip) {
-    return (chip != NULL) ? chip->lines.addrLatchEnable : 0U;
+    return (chip != NULL) ? !!chip->lines.addrLatchEnable : 0U;
 }
 
 /* Returns the state of the "Command Latch Enable" control line in `chip`. */
 dzByte dzChipGetCLE(const dzChip *chip) {
-    return (chip != NULL) ? chip->lines.cmdLatchEnable : 0U;
+    return (chip != NULL) ? !!chip->lines.cmdLatchEnable : 0U;
 }
 
 /* Returns the state of the "Chip Enable" control line in `chip`. */
 dzByte dzChipGetCE(const dzChip *chip) {
-    return (chip != NULL) ? chip->lines.chipEnable : 1U;
-}
-
-/* Returns the state of the "Read Enable" control line in `chip`. */
-dzByte dzChipGetRE(const dzChip *chip) {
-    return (chip != NULL) ? chip->lines.readEnable : 1U;
-}
-
-/* Returns the state of the "Write Enable" control line in `chip`. */
-dzByte dzChipGetWE(const dzChip *chip) {
-    return (chip != NULL) ? chip->lines.writeEnable : 1U;
+    return (chip != NULL) ? !!chip->lines.chipEnable : 1U;
 }
 
 /* Returns the state of the "Ready/Busy" control line in `chip`. */
 dzByte dzChipGetRB(const dzChip *chip) {
-    return (chip != NULL) ? chip->readyBusy : 1U;
+    return (chip != NULL) ? dzChipIsReady((dzChip *) chip) : 0U;
+}
+
+/* Returns the state of the "Write Protect" control line in `chip`. */
+dzByte dzChipGetWP(const dzChip *chip) {
+    return (chip != NULL) ? !!chip->lines.writeProtect : 1U;
 }
 
 /* ------------------------------------------------------------------------> */
@@ -231,18 +283,20 @@ void dzChipSetCE(dzChip *chip, dzByte state) {
     chip->lines.chipEnable = state;
 }
 
-/* Sets the state of the "Read Enable" control line in `chip`. */
-void dzChipSetRE(dzChip *chip, dzByte state) {
+/* ------------------------------------------------------------------------> */
+
+/* Toggles the state of the "Read Enable" control line in `chip`. */
+void dzChipToggleRE(dzChip *chip) {
     if (chip == NULL) return;
 
-    chip->lines.readEnable = state;
+    chip->lines.readEnable = 0xFFU;
 }
 
-/* Sets the state of the "Write Enable" control line in `chip`. */
-void dzChipSetWE(dzChip *chip, dzByte state) {
+/* Toggles the state of the "Write Enable" control line in `chip`. */
+void dzChipToggleWE(dzChip *chip) {
     if (chip == NULL) return;
 
-    chip->lines.writeEnable = state;
+    chip->lines.writeEnable = 0xFFU;
 }
 
 /* Sets the state of the "Write Protect" control line in `chip`. */
@@ -250,15 +304,49 @@ void dzChipSetWP(dzChip *chip, dzByte state) {
     if (chip == NULL) return;
 
     chip->lines.writeProtect = state;
+
+    // TODO: ?
 }
 
 /* Private Functions ======================================================> */
 
 /* Performs `command` on `chip`. */
-static void dzChipDecodeCommand(dzChip *chip, dzByte command) {
+static void dzChipDecodeCommand(dzChip *chip, dzByte command, dzTimestamp ts) {
+    chip->command = command;
+
     switch (command) {
         case DZ_CHIP_CMD_RESET:
-            dzChipReset(chip);
+            dzChipReset(chip, ts);
+
+            break;
+
+        case DZ_CHIP_CMD_READ_ID:
+            // NOTE: Wait for 1 address cycle
+
+            break;
+
+        default:
+            DZ_API_UNIMPLEMENTED();
+    }
+}
+
+/* Writes `address` to `chip`'s address register. */
+static void dzChipWriteAddress(dzChip *chip, dzByte address, dzTimestamp ts) {
+    if (chip->addressCycleCount
+        >= (sizeof chip->address / sizeof *(chip->address)))
+        return;
+
+    DZ_API_UNUSED_VARIABLE(ts);
+
+    chip->address[chip->addressCycleCount++] = address;
+
+    switch (chip->command) {
+        case DZ_CHIP_CMD_READ_ID:
+            if (address != 0x00U && address != 0x20U) {
+                chip->addressCycleCount = 0U;
+
+                return;
+            }
 
             break;
 
@@ -269,8 +357,41 @@ static void dzChipDecodeCommand(dzChip *chip, dzByte command) {
 
 /* ------------------------------------------------------------------------> */
 
-/* Performs a "Reset" operation on `chip`. */
-static void dzChipReset(dzChip *chip) {
+/* Performs a "Power-On Reset" operation on `chip`. */
+static void dzChipPowerOnReset(dzChip *chip) {
     for (dzByte i = 0U; i < chip->config.dieCount; i++)
-        dzDieReset(chip->dies[i]);
+        dzDieDecodeCommand(chip->dies[i],
+                           DZ_CHIP_CMD_RESET,
+                           chip->currentTime);
+
+    dzTimestamp elapsedTime = 0U;
+
+    for (dzByte i = 0U; i < chip->config.dieCount; i++) {
+        dzTimestamp tRST = dzDieWaitUntilRDY(chip->dies[i]);
+
+        if (elapsedTime < tRST) elapsedTime = tRST;
+    }
+
+    chip->currentTime += elapsedTime;
+}
+
+/* Performs a "Reset" operation on `chip`. */
+static void dzChipReset(dzChip *chip, dzTimestamp ts) {
+    // NOTE: Target-level Command
+    if (!chip->isReady) return;
+
+    for (dzByte i = 0U; i < chip->config.dieCount; i++)
+        dzDieDecodeCommand(chip->dies[i], DZ_CHIP_CMD_RESET, ts);
+}
+
+/* ------------------------------------------------------------------------> */
+
+/* Returns `1U` if `chip` is ready. */
+DZ_API_STATIC_INLINE dzByte dzChipIsReady(dzChip *chip) {
+    dzByte result = 1U;
+
+    for (dzByte i = 0U; i < chip->config.dieCount; i++)
+        result &= dzDieGetRDY(chip->dies[i]);
+
+    return (chip->isReady = result);
 }

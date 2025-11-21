@@ -41,9 +41,8 @@ const dzID DZ_API_INVALID_ID = UINT64_MAX;
 
 /* Private Variables ======================================================> */
 
-static dzU64 splitMix64State = 0U;
-
-static dzU64 prngStates[4] = { 0x2025U, 0x1114U, 0x1927U, 0x8509U };
+static dzU64 prngStates[4] = { 0x2025U, 0x1114U, 0x1927U, 0x8509U },
+             splitMix64State = 0U;
 
 /* Private Function Prototypes ============================================> */
 
@@ -67,12 +66,12 @@ dzF64 dzUtilsGaussian(dzF64 mu, dzF64 sigma) {
 
     static dzBool hasNextValue = false;
 
-    static dzF64 nextValue = 0.0;
+    static dzF64 nextValue = 0.0, result = 0.0;
 
     if (hasNextValue) {
         hasNextValue = !hasNextValue;
 
-        return mu + (nextValue * sigma);
+        result = mu + (nextValue * sigma);
     } else {
         dzF64 x, y, r;
 
@@ -87,8 +86,10 @@ dzF64 dzUtilsGaussian(dzF64 mu, dzF64 sigma) {
 
         nextValue = y * r, hasNextValue = !hasNextValue;
 
-        return mu + ((x * r) * sigma);
+        result = mu + ((x * r) * sigma);
     }
+
+    return result;
 }
 
 /* Returns a pseudo-random unsigned 64-bit value. */

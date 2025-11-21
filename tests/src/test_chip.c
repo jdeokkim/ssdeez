@@ -48,7 +48,8 @@ static dzChip *chip = NULL;
 static void dzTestSetupCb(void *ctx);
 static void dzTestTeardownCb(void *ctx);
 
-TEST dzTestChipOps(void);
+TEST dzTestChipReadID(void);
+TEST dzTestChipReset(void);
 
 /* Public Functions =======================================================> */
 
@@ -56,7 +57,9 @@ SUITE(dzTestChip) {
     SET_SETUP(dzTestSetupCb, NULL);
     SET_TEARDOWN(dzTestTeardownCb, NULL);
 
-    RUN_TEST(dzTestChipOps);
+    RUN_TEST(dzTestChipReset);
+
+    RUN_TEST(dzTestChipReadID);
 }
 
 /* Private Functions ======================================================> */
@@ -75,18 +78,64 @@ static void dzTestTeardownCb(void *ctx) {
 
 /* ------------------------------------------------------------------------> */
 
-TEST dzTestChipOps(void) {
+TEST dzTestChipReset(void) {
     ASSERT_NEQ(chip, NULL);
 
     {
-        /* Initialization */
-
-        ASSERT_EQ(dzChipGetRB(chip), 0U);
+        ASSERT_EQ(dzChipGetRB(chip), 1U);
 
         dzChipSetCE(chip, 0U);
-        dzChipSetCLE(chip, 1U);
 
-        dzChipWrite(chip, DZ_CHIP_CMD_RESET);
+        dzChipSetCLE(chip, 1U);
+        dzChipToggleWE(chip);
+
+        dzChipWrite(chip, DZ_CHIP_CMD_RESET, 100U);
+
+        ASSERT_EQ(dzChipGetRB(chip), 0U);
+    }
+
+    PASS();
+}
+
+TEST dzTestChipReadID(void) {
+    ASSERT_NEQ(chip, NULL);
+
+    {
+        ASSERT_EQ(dzChipGetRB(chip), 1U);
+
+        dzChipSetCE(chip, 0U);
+
+        dzChipSetCLE(chip, 1U);
+        dzChipToggleWE(chip);
+
+        dzChipWrite(chip, DZ_CHIP_CMD_READ_ID, 100U);
+
+        dzChipSetALE(chip, 1U);
+        dzChipToggleWE(chip);
+
+        // NOTE: Undefined behavior
+        dzChipWrite(chip, 0xFFU, 150U);
+
+        dzChipToggleWE(chip);
+
+        dzChipWrite(chip, 0x20U, 200U);
+
+        dzChipSetALE(chip, 0U);
+        dzChipSetCLE(chip, 0U);
+
+        dzByte data = 0xFFU;
+
+        const char onfiSignature[] = { 'O', 'N', 'F', 'I' };
+
+        for (dzU32 i = 0U, j = sizeof onfiSignature / sizeof *onfiSignature;
+             i < j;
+             i++) {
+            dzChipToggleRE(chip);
+
+            dzChipRead(chip, &data, 300U + (i * 100U));
+
+            ASSERT_EQ(data, onfiSignature[i]);
+        }
     }
 
     PASS();
