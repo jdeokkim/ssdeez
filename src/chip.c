@@ -34,6 +34,7 @@
 
 /* An enumeration that represents the current state of a NAND flash die. */
 typedef enum dzChipState_ {
+    DZ_CHIP_STATE_GF_RETRIEVE_PARAMS,
     DZ_CHIP_STATE_IDLE,
     DZ_CHIP_STATE_IDLE_RD
 } dzChipState;
@@ -56,12 +57,14 @@ struct dzChip_ {
     dzChipConfig config;
     dzChipCommand command;
     dzTimestamp currentTime;
-    dzByte address[7], addressCycleCount;  
+    dzByte address[7], addressCycleCount;
     dzDie **dies;
     dzChipCtrlLines lines;
     dzByte isReady;                        // R/B# (`0U` = BUSY)
     dzUSize offset;                        // R/W Position Indicator
     dzChipState state;
+    dzByte dieIndex;
+    dzByte timingMode;
 };
 
 // clang-format on
@@ -93,7 +96,8 @@ static void dzChipWriteAddress(dzChip *chip, dzByte address, dzTimestamp ts);
 
 // TODO: dzChipCopyback()
 
-// TODO: dzChipGetFeatures()
+/* Performs a "Get Features" operation on `chip`. */
+static void dzChipGetFeatures(dzChip *chip, dzByte *result);
 
 // TODO: dzChipPageProgram()
 
@@ -181,6 +185,9 @@ dzResult dzChipInit(dzChip **chip, dzChipConfig config) {
 
         newChip->state = DZ_CHIP_STATE_IDLE;
 
+        newChip->dieIndex = 0U;
+        newChip->timingMode = 0U;
+
         dzChipPowerOnReset(newChip);
     }
 
@@ -206,6 +213,11 @@ void dzChipRead(dzChip *chip, dzByte *data, dzTimestamp ts) {
         return;
 
     switch (chip->command) {
+        case DZ_CHIP_CMD_GET_FEATURES:
+            dzChipGetFeatures(chip, data);
+
+            break;
+
         case DZ_CHIP_CMD_READ_ID:
             dzChipReadID(chip, data);
 
@@ -236,6 +248,13 @@ void dzChipWrite(dzChip *chip, dzByte data, dzTimestamp ts) {
 
     chip->currentTime = ts;
     chip->lines.writeEnable = 1U;
+}
+
+/* ------------------------------------------------------------------------> */
+
+/* Returns the current timestamp of `chip`, in microseconds. */
+dzTimestamp dzChipGetCurrentTime(const dzChip *chip) {
+    return (chip != NULL) ? chip->currentTime : 0U;
 }
 
 /* ------------------------------------------------------------------------> */
@@ -326,6 +345,11 @@ static void dzChipDecodeCommand(dzChip *chip, dzByte command, dzTimestamp ts) {
     chip->command = command;
 
     switch (command) {
+        case DZ_CHIP_CMD_GET_FEATURES:
+            // NOTE: Wait for 1 address cycle
+
+            break;
+
         case DZ_CHIP_CMD_RESET:
             dzChipReset(chip, ts);
 
@@ -347,11 +371,16 @@ static void dzChipWriteAddress(dzChip *chip, dzByte address, dzTimestamp ts) {
         >= (sizeof chip->address / sizeof *(chip->address)))
         return;
 
-    DZ_API_UNUSED_VARIABLE(ts);
-
     chip->address[chip->addressCycleCount++] = address;
 
     switch (chip->command) {
+        case DZ_CHIP_CMD_GET_FEATURES:
+            chip->addressCycleCount = 0U;
+
+            chip->state = DZ_CHIP_STATE_GF_RETRIEVE_PARAMS;
+
+            break;
+
         case DZ_CHIP_CMD_READ_ID:
             chip->addressCycleCount = 0U;
 
@@ -360,9 +389,31 @@ static void dzChipWriteAddress(dzChip *chip, dzByte address, dzTimestamp ts) {
         default:
             DZ_API_UNIMPLEMENTED();
     }
+
+    chip->currentTime = ts;
 }
 
 /* ------------------------------------------------------------------------> */
+
+/* Performs a "Get Features" operation on `chip`. */
+static void dzChipGetFeatures(dzChip *chip, dzByte *result) {
+    // NOTE: Target-level Command
+    if (!chip->isReady) return;
+
+    if (chip->address[0] == 0x01U) {
+        if (chip->offset >= 4U) {
+            *result = 0xFFU;
+
+            chip->state = DZ_CHIP_STATE_IDLE;
+
+            return;
+        }
+
+        *result = (chip->offset == 0U) ? chip->timingMode : 0x00U;
+
+        chip->offset++;
+    }
+}
 
 /* Performs a "Power-On Reset" operation on `chip`. */
 static void dzChipPowerOnReset(dzChip *chip) {
@@ -384,10 +435,15 @@ static void dzChipPowerOnReset(dzChip *chip) {
     chip->currentTime += elapsedTime;
 
     chip->state = DZ_CHIP_STATE_IDLE;
+
+    (void) dzChipIsReady(chip);
 }
 
 /* Performs a "Read ID" operation on `chip`. */
 static void dzChipReadID(dzChip *chip, dzByte *result) {
+    // NOTE: Target-level Command
+    if (!chip->isReady) return;
+
     if (chip->address[0] == 0x00U) {
         // NOTE: JEDEC Manufacturer ID and Device ID
         *result = 0x00U;

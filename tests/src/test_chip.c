@@ -48,6 +48,7 @@ static dzChip *chip = NULL;
 static void dzTestSetupCb(void *ctx);
 static void dzTestTeardownCb(void *ctx);
 
+TEST dzTestChipGetFeatures(void);
 TEST dzTestChipReadID(void);
 TEST dzTestChipReset(void);
 
@@ -57,9 +58,9 @@ SUITE(dzTestChip) {
     SET_SETUP(dzTestSetupCb, NULL);
     SET_TEARDOWN(dzTestTeardownCb, NULL);
 
-    RUN_TEST(dzTestChipReset);
-
+    RUN_TEST(dzTestChipGetFeatures);
     RUN_TEST(dzTestChipReadID);
+    RUN_TEST(dzTestChipReset);
 }
 
 /* Private Functions ======================================================> */
@@ -68,6 +69,8 @@ static void dzTestSetupCb(void *ctx) {
     DZ_API_UNUSED_VARIABLE(ctx);
 
     (void) dzChipInit(&chip, chipConfig);
+
+    dzChipSetCE(chip, 0U);
 }
 
 static void dzTestTeardownCb(void *ctx) {
@@ -78,13 +81,48 @@ static void dzTestTeardownCb(void *ctx) {
 
 /* ------------------------------------------------------------------------> */
 
-TEST dzTestChipReset(void) {
+TEST dzTestChipGetFeatures(void) {
     ASSERT_NEQ(chip, NULL);
 
     {
         ASSERT_EQ(dzChipGetRB(chip), 1U);
 
-        dzChipSetCE(chip, 0U);
+        dzChipSetCLE(chip, 1U);
+        dzChipToggleWE(chip);
+
+        dzChipWrite(chip, DZ_CHIP_CMD_GET_FEATURES, 100U);
+
+        dzChipSetALE(chip, 1U);
+        dzChipToggleWE(chip);
+
+        // NOTE: Undefined behavior
+        dzChipWrite(chip, 0x00U, 150U);
+    }
+
+    {
+        dzChipSetALE(chip, 1U);
+        dzChipToggleWE(chip);
+
+        dzChipWrite(chip, 0x01U, 250U);
+
+        dzByte data = 0xFFU;
+
+        dzChipToggleRE(chip);
+
+        dzChipRead(chip, &data, 350U);
+
+        // NOTE: Timing Mode 0
+        ASSERT_EQ(data, 0x00U);
+    }
+
+    PASS();
+}
+
+TEST dzTestChipReset(void) {
+    ASSERT_NEQ(chip, NULL);
+
+    {
+        ASSERT_EQ(dzChipGetRB(chip), 1U);
 
         dzChipSetCLE(chip, 1U);
         dzChipToggleWE(chip);
@@ -102,8 +140,6 @@ TEST dzTestChipReadID(void) {
 
     {
         ASSERT_EQ(dzChipGetRB(chip), 1U);
-
-        dzChipSetCE(chip, 0U);
 
         dzChipSetCLE(chip, 1U);
         dzChipToggleWE(chip);

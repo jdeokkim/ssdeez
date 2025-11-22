@@ -268,6 +268,11 @@ void dzChipWrite(dzChip *chip, dzByte data, dzTimestamp ts);
 
 /* ------------------------------------------------------------------------> */
 
+/* Returns the current timestamp of `chip`, in microseconds. */
+dzTimestamp dzChipGetCurrentTime(const dzChip *chip);
+
+/* ------------------------------------------------------------------------> */
+
 /* Returns the state of the "Address Latch Enable" control line in `chip`. */
 dzByte dzChipGetALE(const dzChip *chip);
 
