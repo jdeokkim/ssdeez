@@ -32,6 +32,14 @@
 
 // clang-format off
 
+/* An enumeration that represents the current state of a NAND flash die. */
+typedef enum dzChipState_ {
+    DZ_CHIP_STATE_IDLE,
+    DZ_CHIP_STATE_IDLE_RD
+} dzChipState;
+
+/* ------------------------------------------------------------------------> */
+
 /* A structure that represents the control lines of a NAND flash chip. */
 typedef struct dzChipCtrlLines_ {
     dzByte chipEnable;       // CE# (`0U` = ACTIVE)
@@ -53,6 +61,7 @@ struct dzChip_ {
     dzChipCtrlLines lines;
     dzByte isReady;                        // R/B# (`0U` = BUSY)
     dzUSize offset;                        // R/W Position Indicator
+    dzChipState state;
 };
 
 // clang-format on
@@ -94,6 +103,9 @@ static void dzChipPowerOnReset(dzChip *chip);
 // TODO: dzChipRead()
 
 // TODO: dzChipReadCache()
+
+/* Performs a "Read ID" operation on `chip`. */
+static void dzChipReadID(dzChip *chip, dzByte *result);
 
 // TODO: dzChipReadParameterPage()
 
@@ -167,6 +179,8 @@ dzResult dzChipInit(dzChip **chip, dzChipConfig config) {
         newChip->isReady = 1U;
         newChip->offset = 0U;
 
+        newChip->state = DZ_CHIP_STATE_IDLE;
+
         dzChipPowerOnReset(newChip);
     }
 
@@ -193,10 +207,7 @@ void dzChipRead(dzChip *chip, dzByte *data, dzTimestamp ts) {
 
     switch (chip->command) {
         case DZ_CHIP_CMD_READ_ID:
-            *data = onfiSignature[chip->offset];
-
-            if (chip->offset < sizeof onfiSignature / sizeof *onfiSignature)
-                chip->offset++;
+            dzChipReadID(chip, data);
 
             break;
 
@@ -342,11 +353,7 @@ static void dzChipWriteAddress(dzChip *chip, dzByte address, dzTimestamp ts) {
 
     switch (chip->command) {
         case DZ_CHIP_CMD_READ_ID:
-            if (address != 0x00U && address != 0x20U) {
-                chip->addressCycleCount = 0U;
-
-                return;
-            }
+            chip->addressCycleCount = 0U;
 
             break;
 
@@ -359,6 +366,8 @@ static void dzChipWriteAddress(dzChip *chip, dzByte address, dzTimestamp ts) {
 
 /* Performs a "Power-On Reset" operation on `chip`. */
 static void dzChipPowerOnReset(dzChip *chip) {
+    chip->command = DZ_CHIP_CMD_RESET;
+
     for (dzByte i = 0U; i < chip->config.dieCount; i++)
         dzDieDecodeCommand(chip->dies[i],
                            DZ_CHIP_CMD_RESET,
@@ -373,6 +382,26 @@ static void dzChipPowerOnReset(dzChip *chip) {
     }
 
     chip->currentTime += elapsedTime;
+
+    chip->state = DZ_CHIP_STATE_IDLE;
+}
+
+/* Performs a "Read ID" operation on `chip`. */
+static void dzChipReadID(dzChip *chip, dzByte *result) {
+    if (chip->address[0] == 0x00U) {
+        // NOTE: JEDEC Manufacturer ID and Device ID
+        *result = 0x00U;
+    } else if (chip->address[0] == 0x20U) {
+        if (chip->offset >= sizeof onfiSignature / sizeof *onfiSignature) {
+            *result = 0xFFU;
+
+            chip->state = DZ_CHIP_STATE_IDLE_RD;
+
+            return;
+        }
+
+        *result = onfiSignature[chip->offset++];
+    }
 }
 
 /* Performs a "Reset" operation on `chip`. */

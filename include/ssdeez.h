@@ -73,6 +73,29 @@ extern "C" {
 /* Suppresses the "unused parameter/variable" errors. */
 #define DZ_API_UNUSED_VARIABLE(x)  ((void) (x))
 
+/* ------------------------------------------------------------------------> */
+
+/* Logs a message with the given `level`. */
+#define DZ_API_LOG(level, ...)                        \
+    do {                                              \
+        fprintf(stderr, level ": %s(): ", __func__),  \
+        fprintf(stderr, __VA_ARGS__);                 \
+    } while (0)                                       \
+
+/* Logs a message with the 'DEBUG' level. */
+#define DZ_API_DEBUG(...)    DZ_API_LOG("DEBUG", __VA_ARGS__);
+
+/* Logs a message with the 'ERROR' level. */
+#define DZ_API_ERROR(...)    DZ_API_LOG("ERROR", __VA_ARGS__);
+
+/* Logs a message with the 'INFO' level. */
+#define DZ_API_INFO(...)     DZ_API_LOG("INFO", __VA_ARGS__);
+
+/* Logs a message with the 'WARNING' level. */
+#define DZ_API_WARNING(...)  DZ_API_LOG("WARNING", __VA_ARGS__);
+
+/* ------------------------------------------------------------------------> */
+
 /* Represents the current API version of SSDeez. */
 #define DZ_API_VERSION             "0.0.1"
 

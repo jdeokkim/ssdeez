@@ -115,7 +115,10 @@ TEST dzTestChipReadID(void) {
 
         // NOTE: Undefined behavior
         dzChipWrite(chip, 0xFFU, 150U);
+    }
 
+    {
+        dzChipSetALE(chip, 1U);
         dzChipToggleWE(chip);
 
         dzChipWrite(chip, 0x20U, 200U);
@@ -136,6 +139,28 @@ TEST dzTestChipReadID(void) {
 
             ASSERT_EQ(data, onfiSignature[i]);
         }
+
+        dzChipToggleRE(chip);
+
+        dzChipRead(chip, &data, 700U);
+
+        // NOTE: Undefined behavior
+        ASSERT_EQ(data, 0xFFU);
+    }
+
+    {
+        dzChipSetALE(chip, 1U);
+        dzChipToggleWE(chip);
+
+        dzChipWrite(chip, 0x00U, 1000U);
+
+        dzByte data = 0xFFU;
+
+        dzChipToggleRE(chip);
+
+        dzChipRead(chip, &data, 1100U);
+
+        ASSERT_EQ(data, 0x00U);
     }
 
     PASS();
