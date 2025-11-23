@@ -86,7 +86,7 @@ struct dzDie_ {
 // clang-format off
 
 /* Average "page program time" for each cell type, in microseconds. */
-static const dzU32 tPROGTable[DZ_CELL_TYPE_COUNT_] = {
+static const dzU16 tPROGTable[DZ_CELL_TYPE_COUNT_] = {
     [DZ_CELL_TYPE_SLC] = 850U,
     [DZ_CELL_TYPE_MLC] = 2250U,
     [DZ_CELL_TYPE_TLC] = 3750U,
@@ -94,7 +94,7 @@ static const dzU32 tPROGTable[DZ_CELL_TYPE_COUNT_] = {
 };
 
 /* Average "page read time" for each cell type, in microseconds. */
-static const dzU32 tRTable[DZ_CELL_TYPE_COUNT_] = { 
+static const dzU16 tRTable[DZ_CELL_TYPE_COUNT_] = { 
     [DZ_CELL_TYPE_SLC] = 15U,
     [DZ_CELL_TYPE_MLC] = 35U,
     [DZ_CELL_TYPE_TLC] = 60U,
@@ -105,7 +105,7 @@ static const dzU32 tRTable[DZ_CELL_TYPE_COUNT_] = {
     Average "reset time" when not performing a "program" 
     or an "erase" operation, for each cell type, in microseconds. 
 */
-static const dzU32 tRST0Table[DZ_CELL_TYPE_COUNT_] = {
+static const dzU16 tRST0Table[DZ_CELL_TYPE_COUNT_] = {
     [DZ_CELL_TYPE_SLC] = 5U,
     [DZ_CELL_TYPE_MLC] = 8U,
     [DZ_CELL_TYPE_TLC] = 10U,
@@ -116,7 +116,7 @@ static const dzU32 tRST0Table[DZ_CELL_TYPE_COUNT_] = {
     Average "reset time" when performing a "program" operation, 
     for each cell type, in microseconds. 
 */
-static const dzU32 tRST1Table[DZ_CELL_TYPE_COUNT_] = {
+static const dzU16 tRST1Table[DZ_CELL_TYPE_COUNT_] = {
     [DZ_CELL_TYPE_SLC] = 11U,
     [DZ_CELL_TYPE_MLC] = 14U,
     [DZ_CELL_TYPE_TLC] = 18U,
@@ -127,7 +127,7 @@ static const dzU32 tRST1Table[DZ_CELL_TYPE_COUNT_] = {
     Average "reset time" when performing an "erase" operation, 
     for each cell type, in microseconds. 
 */
-static const dzU32 tRST2Table[DZ_CELL_TYPE_COUNT_] = {
+static const dzU16 tRST2Table[DZ_CELL_TYPE_COUNT_] = {
     [DZ_CELL_TYPE_SLC] = 400U,
     [DZ_CELL_TYPE_MLC] = 650U,
     [DZ_CELL_TYPE_TLC] = 725U,
@@ -135,7 +135,7 @@ static const dzU32 tRST2Table[DZ_CELL_TYPE_COUNT_] = {
 };
 
 /* Average "block erase time" for each cell type, in microseconds. */
-static const dzU32 tBERSTable[DZ_CELL_TYPE_COUNT_] = {
+static const dzU16 tBERSTable[DZ_CELL_TYPE_COUNT_] = {
     [DZ_CELL_TYPE_SLC] = 2000U,
     [DZ_CELL_TYPE_MLC] = 3000U,
     [DZ_CELL_TYPE_TLC] = 3500U,

@@ -50,7 +50,6 @@ SSDEEZ_LIBRARY_PATH = ../lib
 
 OBJECTS = \
 	${SOURCE_PATH}/test_chip.o   \
-	${SOURCE_PATH}/test_die.o    \
 	${SOURCE_PATH}/test_utils.o  \
 	${SOURCE_PATH}/main.o
 

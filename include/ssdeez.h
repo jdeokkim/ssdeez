@@ -240,6 +240,7 @@ typedef struct dzChipConfig_ {
     dzDieConfig dieConfig;
     dzID chipId;
     dzByte dieCount;
+    dzBool isVerbose;
 } dzChipConfig;
 
 /* A structure that represents a NAND flash chip, also known as a 'target'. */

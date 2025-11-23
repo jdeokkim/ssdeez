@@ -37,9 +37,16 @@ static const dzDieConfig dieConfig = { .cellType = DZ_CELL_TYPE_SLC,
 
 /* Private Variables ======================================================> */
 
-static dzChipConfig chipConfig = { .dieConfig = dieConfig,
-                                   .chipId = 0U,
-                                   .dieCount = 2U };
+// clang-format off
+
+static dzChipConfig chipConfig = {
+    .dieConfig = dieConfig, 
+    .chipId = 0U, 
+    .dieCount = 2U, 
+    .isVerbose = false
+};
+
+// clang-format on
 
 static dzChip *chip = NULL;
 
