@@ -224,6 +224,7 @@ typedef struct dzDieConfig_ {
     dzU16 blockCountPerPlane;
     dzU16 pageCountPerBlock;
     dzU16 pageSizeInBytes;
+    dzBool isVerbose;
 } dzDieConfig;
 
 /* A structure that represents a NAND flash die. */

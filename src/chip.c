@@ -225,13 +225,13 @@ dzResult dzChipInit(dzChip **chip, dzChipConfig config) {
 
         for (dzU32 i = 0U; i < config.dieCount; i++) {
             config.dieConfig.dieId = i;
-
-            if (config.isVerbose) DZ_API_INFO("initializing die #%u\n", i);
+            config.dieConfig.isVerbose = config.isVerbose;
 
             dzResult dieInitResult = dzDieInit(&(newChip->dies[i]),
                                                config.dieConfig);
 
             if (dieInitResult != DZ_RESULT_OK) {
+                free(newChip->addresses.ptr);
                 free(newChip->dies), free(newChip);
 
                 return dieInitResult;

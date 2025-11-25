@@ -174,6 +174,9 @@ static dzBool dzDieInitPages(dzDie *die);
 /* Mark a random number of blocks as defective. */
 static dzBool dzDieCorruptRandomBlocks(dzDie *die);
 
+/* Creates an ONFI parameter page section on the first block of `die`.  */
+static dzBool dzDieCreateParameterPages(dzDie *die);
+
 /* Returns the previous or the next index of `blockIndex` within `die`. */
 static dzID dzDieGetAdjacentBlockIndex(dzDie *die, dzID blockIndex);
 
@@ -209,13 +212,29 @@ dzResult dzDieInit(dzDie **die, dzDieConfig config) {
 
     // clang-format on
 
-    if ((config.pageCountPerBlock % 32U) != 0U
-        || (config.pageSizeInBytes & 1U) != 0U)
+    if ((config.pageCountPerBlock % 32U) != 0U) {
+        DZ_API_ERROR("`pageCountPerBlock` should be a multiple of 32\n");
+
         return DZ_RESULT_INVALID_ARGUMENT;
+    }
+
+    if ((config.pageSizeInBytes & (config.pageSizeInBytes - 1U)) != 0U) {
+        DZ_API_ERROR("`pageSizeInBytes` should be a power of 2\n");
+
+        return DZ_RESULT_INVALID_ARGUMENT;
+    }
+
+    if (config.pageSizeInBytes < 512U) {
+        DZ_API_ERROR("`pageSizeInBytes` should be greater than 512\n");
+
+        return DZ_RESULT_INVALID_ARGUMENT;
+    }
 
     dzDie *newDie = malloc(sizeof *newDie);
 
     if (newDie == NULL) return DZ_RESULT_OUT_OF_MEMORY;
+
+    if (config.isVerbose) DZ_API_INFO("initializing die #%lu\n", config.dieId);
 
     newDie->stats = (dzDieStats) { .totalProgramLatency = 0U,
                                    .totalProgramCount = 0U,
@@ -241,6 +260,12 @@ dzResult dzDieInit(dzDie **die, dzDieConfig config) {
         return DZ_RESULT_OUT_OF_MEMORY;
     }
 
+    if (!dzDieCreateParameterPages(newDie)) {
+        dzDieDeinit(newDie);
+
+        return DZ_RESULT_UNKNOWN;
+    }
+
     if (!dzDieCorruptRandomBlocks(newDie)) {
         dzDieDeinit(newDie);
 
@@ -259,6 +284,9 @@ dzResult dzDieInit(dzDie **die, dzDieConfig config) {
 void dzDieDeinit(dzDie *die) {
     if (die == NULL) return;
 
+    if (die->config.isVerbose)
+        DZ_API_INFO("deinitializing die #%lu\n", die->config.dieId);
+
     free(die->buffer), free(die);
 }
 
@@ -266,10 +294,16 @@ void dzDieDeinit(dzDie *die) {
 void dzDieDecodeCommand(dzDie *die, dzByte command, dzTimestamp ts) {
     if (die == NULL || die->metadata.currentTime >= ts) return;
 
+    if (die->config.isVerbose)
+        DZ_API_INFO("decoded ONFI command 0x%02X\n", command);
+
     dzBool isAcceptableWhileBusy = (command == DZ_CHIP_CMD_READ_STATUS)
                                    || (command == DZ_CHIP_CMD_RESET);
 
     if (!isAcceptableWhileBusy && !(die->status & DZ_DIE_STATUS_RDY)) {
+        if (die->config.isVerbose)
+            DZ_API_INFO("die #%lu is not ready yet\n", die->config.dieId);
+
         dzTimestamp elapsedTime = ts - die->metadata.currentTime;
 
         if (elapsedTime < die->metadata.remainingTime) {
@@ -299,6 +333,11 @@ dzTimestamp dzDieWaitUntilReady(dzDie *die) {
     if (die == NULL || die->status & DZ_DIE_STATUS_RDY) return 0U;
 
     dzTimestamp result = die->metadata.remainingTime;
+
+    if (die->config.isVerbose)
+        DZ_API_INFO("die #%lu: waiting for %lu us until ready\n",
+                    die->config.dieId,
+                    result);
 
     switch (die->state) {
         case DZ_DIE_STATE_RST_EXECUTE:
@@ -429,6 +468,15 @@ static dzBool dzDieCorruptRandomBlocks(dzDie *die) {
     return true;
 }
 
+/* Creates an ONFI parameter page section on the first block of `die`.  */
+static dzBool dzDieCreateParameterPages(dzDie *die) {
+    DZ_API_UNUSED_VARIABLE(die);
+
+    // DZ_API_UNIMPLEMENTED();
+
+    return true;
+}
+
 /* Returns the previous or the next index of `blockIndex` within `die`. */
 static dzID dzDieGetAdjacentBlockIndex(dzDie *die, dzID blockIndex) {
     dzID prevBlockIndex = (blockIndex > 0U) ? (blockIndex - 1U)
@@ -507,6 +555,10 @@ static void dzDieReset(dzDie *die) {
     if (die->state != DZ_DIE_STATE_RST_EXECUTE) {
         die->status &= (dzByte) ~DZ_DIE_STATUS_RDY;
 
+        if (die->config.isVerbose)
+            DZ_API_INFO("cleared die #%lu's RDY status bit\n",
+                        die->config.dieId);
+
         die->state = DZ_DIE_STATE_RST_EXECUTE;
 
         // TODO: ...
@@ -519,6 +571,9 @@ static void dzDieReset(dzDie *die) {
     } else {
         die->status &= (dzByte) ~(DZ_DIE_STATUS_FAIL | DZ_DIE_STATUS_FAILC);
         die->status |= DZ_DIE_STATUS_RDY;
+
+        if (die->config.isVerbose)
+            DZ_API_INFO("set die #%lu's RDY status bit\n", die->config.dieId);
 
         die->state = DZ_DIE_STATE_IDLE;
 

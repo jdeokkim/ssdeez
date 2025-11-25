@@ -149,6 +149,8 @@ TEST dzTestChipRead(void) {
         dzChipToggleWE(chip);
 
         dzChipWrite(chip, DZ_CHIP_CMD_READ_1, 450U);
+
+        // TODO: ...
     }
 
     PASS();
