@@ -42,17 +42,19 @@
 /* An enumeration that represents the current state of a NAND flash die. */
 typedef enum dzDieState_ {
     DZ_DIE_STATE_IDLE,
-    DZ_DIE_STATE_RST_EXECUTE,
+    DZ_DIE_STATE_RST_EXECUTE
 } dzDieState;
 
 /* ------------------------------------------------------------------------> */
 
 /* A structure that represents the metadata of a NAND flash die. */
 typedef struct dzDieMetadata_ {
+    dzTimestamp currentTime;
+    dzTimestamp remainingTime;
     dzU64 pageCountPerDie;
-    dzU64 blockCountPerDie;
-    dzU64 physicalBlockSize;
-    dzU64 physicalPageSize;
+    dzU32 blockCountPerDie;
+    dzU32 physicalBlockSize;
+    dzU32 physicalPageSize;
     dzU32 maxProgramTime;
     dzU32 maxReadTime;
     dzU32 maxEraseTime;
@@ -60,13 +62,12 @@ typedef struct dzDieMetadata_ {
 
 /* A structure that represents various statistics of a NAND flash die. */
 typedef struct dzDieStats_ {
-    dzF64 totalProgramLatency;
+    dzU64 totalProgramLatency;
     dzU64 totalProgramCount;
-    dzF64 totalReadLatency;
+    dzU64 totalReadLatency;
     dzU64 totalReadCount;
-    dzF64 totalEraseLatency;
+    dzU64 totalEraseLatency;
     dzU64 totalEraseCount;
-    // TODO: ...
 } dzDieStats;
 
 /* A structure that represents a NAND flash die. */
@@ -74,8 +75,6 @@ struct dzDie_ {
     dzDieStats stats;
     dzDieMetadata metadata;
     dzDieConfig config;
-    dzTimestamp currentTime;
-    dzTimestamp remainingTime;
     dzByte *buffer;
     dzDieState state;
     dzByte status;
@@ -165,15 +164,15 @@ static const dzF32 tBERSSigmaRatio = 0.05f;
 /* Private Function Prototypes ============================================> */
 
 /* Initializes the metadata of `die`. */
-static bool dzDieInitMetadata(dzDie *die);
+static dzBool dzDieInitMetadata(dzDie *die);
 
 /* Initializes the data area and the spare area of each page in `die`. */
-static bool dzDieInitPages(dzDie *die);
+static dzBool dzDieInitPages(dzDie *die);
 
 /* ------------------------------------------------------------------------> */
 
 /* Mark a random number of blocks as defective. */
-static bool dzDieCorruptRandomBlocks(dzDie *die);
+static dzBool dzDieCorruptRandomBlocks(dzDie *die);
 
 /* Returns the previous or the next index of `blockIndex` within `die`. */
 static dzID dzDieGetAdjacentBlockIndex(dzDie *die, dzID blockIndex);
@@ -181,10 +180,10 @@ static dzID dzDieGetAdjacentBlockIndex(dzDie *die, dzID blockIndex);
 /* ------------------------------------------------------------------------> */
 
 /* Returns `true` if the `blockIndex`-th block within `die` is defective. */
-static bool dzDieIsBlockDefective(dzDie *die, dzID blockIndex);
+static dzBool dzDieIsBlockDefective(dzDie *die, dzID blockIndex);
 
 /* Marks the `blockIndex`-th block within `die` as defective. */
-static bool dzDieMarkBlockAsDefective(dzDie *die, dzID blockIndex);
+static dzBool dzDieMarkBlockAsDefective(dzDie *die, dzID blockIndex);
 
 /* ------------------------------------------------------------------------> */
 
@@ -201,7 +200,7 @@ dzResult dzDieInit(dzDie **die, dzDieConfig config) {
         || config.dieId == DZ_API_INVALID_ID
         || config.cellType <= DZ_CELL_TYPE_UNKNOWN
         || config.cellType >= DZ_CELL_TYPE_COUNT_
-        || config.badBlockRatio >= 1.0
+        || config.badBlockRatio >= 1.0f
         || config.planeCountPerDie == 0U 
         || config.blockCountPerPlane == 0U
         || config.pageCountPerBlock == 0U
@@ -218,17 +217,17 @@ dzResult dzDieInit(dzDie **die, dzDieConfig config) {
 
     if (newDie == NULL) return DZ_RESULT_OUT_OF_MEMORY;
 
-    newDie->stats = (dzDieStats) { .totalProgramLatency = 0.0,
+    newDie->stats = (dzDieStats) { .totalProgramLatency = 0U,
                                    .totalProgramCount = 0U,
-                                   .totalReadLatency = 0.0,
+                                   .totalReadLatency = 0U,
                                    .totalReadCount = 0U,
-                                   .totalEraseLatency = 0.0,
+                                   .totalEraseLatency = 0U,
                                    .totalEraseCount = 0U };
 
     newDie->config = config;
 
-    newDie->currentTime = 0U;
-    newDie->remainingTime = 0U;
+    newDie->metadata.currentTime = 0U;
+    newDie->metadata.remainingTime = 0U;
 
     if (!dzDieInitMetadata(newDie)) {
         dzDieDeinit(newDie);
@@ -265,21 +264,21 @@ void dzDieDeinit(dzDie *die) {
 
 /* Performs `command` on `die`. */
 void dzDieDecodeCommand(dzDie *die, dzByte command, dzTimestamp ts) {
-    if (die == NULL || die->currentTime >= ts) return;
+    if (die == NULL || die->metadata.currentTime >= ts) return;
 
     dzBool isAcceptableWhileBusy = (command == DZ_CHIP_CMD_READ_STATUS)
                                    || (command == DZ_CHIP_CMD_RESET);
 
     if (!isAcceptableWhileBusy && !(die->status & DZ_DIE_STATUS_RDY)) {
-        dzTimestamp elapsedTime = ts - die->currentTime;
+        dzTimestamp elapsedTime = ts - die->metadata.currentTime;
 
-        if (elapsedTime < die->remainingTime) {
+        if (elapsedTime < die->metadata.remainingTime) {
             die->state = DZ_DIE_STATE_IDLE;
 
             dzDieReset(die);
         }
 
-        die->currentTime = ts;
+        die->metadata.currentTime = ts;
 
         return;
     }
@@ -295,11 +294,11 @@ void dzDieDecodeCommand(dzDie *die, dzByte command, dzTimestamp ts) {
     }
 }
 
-/* Waits until the `die`'s "Ready" status bit is set. */
-dzTimestamp dzDieWaitUntilRDY(dzDie *die) {
+/* Waits until the `die`'s "RDY" status bit is set. */
+dzTimestamp dzDieWaitUntilReady(dzDie *die) {
     if (die == NULL || die->status & DZ_DIE_STATUS_RDY) return 0U;
 
-    dzTimestamp result = die->remainingTime;
+    dzTimestamp result = die->metadata.remainingTime;
 
     switch (die->state) {
         case DZ_DIE_STATE_RST_EXECUTE:
@@ -311,7 +310,7 @@ dzTimestamp dzDieWaitUntilRDY(dzDie *die) {
             DZ_API_UNIMPLEMENTED();
     }
 
-    die->currentTime += result;
+    die->metadata.currentTime += result;
 
     return result;
 }
@@ -326,7 +325,7 @@ dzByte dzDieGetRDY(const dzDie *die) {
 /* Private Functions ======================================================> */
 
 /* Initializes the metadata of `die`. */
-static bool dzDieInitMetadata(dzDie *die) {
+static dzBool dzDieInitMetadata(dzDie *die) {
     die->metadata.blockCountPerDie = die->config.planeCountPerDie
                                      * (dzU64) die->config.blockCountPerPlane;
 
@@ -334,7 +333,7 @@ static bool dzDieInitMetadata(dzDie *die) {
                                     * die->config.pageCountPerBlock;
 
     die->metadata.physicalPageSize = die->config.pageSizeInBytes
-                                     + (dzU64) dzPageGetSpareAreaSize();
+                                     + (dzU32) dzPageGetSpareAreaSize();
 
     die->metadata.physicalBlockSize = die->config.pageCountPerBlock
                                       * die->metadata.physicalPageSize;
@@ -370,7 +369,7 @@ static bool dzDieInitMetadata(dzDie *die) {
 }
 
 /* Initializes the data area and the spare area of each page in `die`. */
-static bool dzDieInitPages(dzDie *die) {
+static dzBool dzDieInitPages(dzDie *die) {
     const dzDieConfig config = die->config;
     const dzDieMetadata metadata = die->metadata;
 
@@ -397,17 +396,17 @@ static bool dzDieInitPages(dzDie *die) {
 /* ------------------------------------------------------------------------> */
 
 /* Mark a random number of blocks as defective. */
-static bool dzDieCorruptRandomBlocks(dzDie *die) {
-    dzU64 blockCountPerDie = die->metadata.blockCountPerDie;
+static dzBool dzDieCorruptRandomBlocks(dzDie *die) {
+    dzU32 blockCountPerDie = die->metadata.blockCountPerDie;
 
-    if (die->config.badBlockRatio <= 0.0) return true;
+    if (die->config.badBlockRatio <= 0.0f) return true;
 
-    dzF64 badBlockCountAsF64 = die->config.badBlockRatio
-                               * (dzF64) blockCountPerDie;
+    dzF32 badBlockCountAsF32 = die->config.badBlockRatio
+                               * (dzF32) blockCountPerDie;
 
-    dzU64 badBlockCount = (dzU64) badBlockCountAsF64;
+    dzU32 badBlockCount = (dzU32) badBlockCountAsF32;
 
-    if ((badBlockCountAsF64 - (dzU64) badBlockCountAsF64) > 0.0)
+    if ((badBlockCountAsF32 - (dzU32) badBlockCountAsF32) > 0.0f)
         badBlockCount++;
 
     // NOTE: Block #0 is always guaranteed to be a 'good' block
@@ -462,7 +461,7 @@ static dzID dzDieGetAdjacentBlockIndex(dzDie *die, dzID blockIndex) {
 /* ------------------------------------------------------------------------> */
 
 /* Returns `true` if the `blockIndex`-th block within `die` is defective. */
-static bool dzDieIsBlockDefective(dzDie *die, dzID blockIndex) {
+static dzBool dzDieIsBlockDefective(dzDie *die, dzID blockIndex) {
     if (die == NULL || blockIndex == DZ_API_INVALID_ID) return true;
 
     dzPage firstPage = {
@@ -483,7 +482,7 @@ static bool dzDieIsBlockDefective(dzDie *die, dzID blockIndex) {
 }
 
 /* Marks the `blockIndex`-th block within `die` as defective. */
-static bool dzDieMarkBlockAsDefective(dzDie *die, dzID blockIndex) {
+static dzBool dzDieMarkBlockAsDefective(dzDie *die, dzID blockIndex) {
     dzPage firstPage = {
         .ptr = die->buffer + (blockIndex * die->metadata.physicalBlockSize),
         .size = die->config.pageSizeInBytes
@@ -511,7 +510,7 @@ static void dzDieReset(dzDie *die) {
         die->state = DZ_DIE_STATE_RST_EXECUTE;
 
         // TODO: ...
-        die->remainingTime = (dzU64)
+        die->metadata.remainingTime = (dzU64)
             dzUtilsGaussian((dzF64) tRST0Table[die->config.cellType],
                             tRSTSigmaRatio);
 
@@ -523,6 +522,6 @@ static void dzDieReset(dzDie *die) {
 
         die->state = DZ_DIE_STATE_IDLE;
 
-        die->remainingTime = 0U;
+        die->metadata.remainingTime = 0U;
     }
 }

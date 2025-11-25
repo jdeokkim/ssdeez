@@ -24,10 +24,6 @@
 
 #include "ssdeez.h"
 
-/* Macros =================================================================> */
-
-// TODO: ...
-
 /* Typedefs ===============================================================> */
 
 // clang-format off
@@ -52,23 +48,39 @@ typedef struct dzChipCtrlLines_ {
     dzByte lockEnable;       // LOCK (`1U` = ACTIVE)
 } dzChipCtrlLines;
 
+/* A structure that represents the metadata of a NAND flash chip. */
+typedef struct dzChipMetadata_ {
+    dzTimestamp currentTime;
+    dzTimestamp remainingTime;
+} dzChipMetadata;
+
 /* A structure that represents a NAND flash chip. */
 struct dzChip_ {
     dzChipConfig config;
     dzChipCommand command;
-    dzTimestamp currentTime, remainingTime;
-    dzByte address[7], addressCycleCount;
+    dzChipMetadata metadata;
+    dzByte address[7];
+    dzByte addressCycleCount;
     dzDie **dies;
     dzChipCtrlLines lines;
-    dzByte isReady;                        // R/B# (`0U` = BUSY)
-    dzUSize offset;                        // R/W Position Indicator
+    dzByte isReady;                          // R/B# (`0U` = BUSY)
+    dzUSize offset;                          // R/W Position Indicator
     dzChipState state;
-    dzByte dieIndex, timingMode;
+    dzByte timingMode;
+    dzByte dieIndex;
 };
 
 // clang-format on
 
 /* Constants ==============================================================> */
+
+/* 
+    Maximum "busy time for 'Get Features' and 'Set Features' time", 
+    in microseconds. 
+*/
+static const dzU16 tFEAT = 1U;
+
+/* ------------------------------------------------------------------------> */
 
 /* ONFI signature bytes. */
 static const dzByte onfiSignature[] = { 'O', 'N', 'F', 'I' };
@@ -146,12 +158,15 @@ dzResult dzChipInit(dzChip **chip, dzChipConfig config) {
     if (newChip == NULL) return DZ_RESULT_OUT_OF_MEMORY;
 
     {
+        if (config.isVerbose)
+            DZ_API_INFO("initializing chip #%lu\n", config.chipId);
+
         newChip->config = config;
 
         newChip->command = DZ_CHIP_CMD_UNKNOWN;
 
-        newChip->currentTime = 1U;
-        newChip->remainingTime = 0U;
+        newChip->metadata.currentTime = 1U;
+        newChip->metadata.remainingTime = 0U;
 
         dzUSize byteCount = sizeof newChip->address
                             / sizeof *(newChip->address);
@@ -166,11 +181,15 @@ dzResult dzChipInit(dzChip **chip, dzChipConfig config) {
         for (dzU32 i = 0U; i < config.dieCount; i++) {
             config.dieConfig.dieId = i;
 
-            if (dzDieInit(&(newChip->dies[i]), config.dieConfig)
-                != DZ_RESULT_OK) {
+            if (config.isVerbose) DZ_API_INFO("initializing die #%u\n", i);
+
+            dzResult dieInitResult = dzDieInit(&(newChip->dies[i]),
+                                               config.dieConfig);
+
+            if (dieInitResult != DZ_RESULT_OK) {
                 free(newChip->dies), free(newChip);
 
-                return DZ_RESULT_UNKNOWN;
+                return dieInitResult;
             }
         }
 
@@ -188,9 +207,6 @@ dzResult dzChipInit(dzChip **chip, dzChipConfig config) {
 
         newChip->dieIndex = 0U;
         newChip->timingMode = 0U;
-
-        if (config.isVerbose)
-            DZ_API_INFO("initializing chip #%lu\n", config.chipId);
 
         dzChipPowerOnReset(newChip);
     }
@@ -240,7 +256,7 @@ void dzChipRead(dzChip *chip, dzByte *data, dzTimestamp ts) {
             DZ_API_UNIMPLEMENTED();
     }
 
-    chip->currentTime = ts;
+    chip->metadata.currentTime = ts;
     chip->lines.readEnable = 1U;
 }
 
@@ -264,15 +280,26 @@ void dzChipWrite(dzChip *chip, dzByte data, dzTimestamp ts) {
         DZ_API_UNIMPLEMENTED();
     }
 
-    chip->currentTime = ts;
+    chip->metadata.currentTime = ts;
     chip->lines.writeEnable = 1U;
+}
+
+/* Waits until `chip` is ready. */
+dzTimestamp dzChipWaitUntilReady(dzChip *chip) {
+    if (chip == NULL || dzChipIsReady(chip)) return 0U;
+
+    chip->metadata.currentTime += chip->metadata.remainingTime;
+
+    chip->metadata.remainingTime = 0U;
+
+    return chip->metadata.currentTime;
 }
 
 /* ------------------------------------------------------------------------> */
 
 /* Returns the current timestamp of `chip`, in microseconds. */
 dzTimestamp dzChipGetCurrentTime(const dzChip *chip) {
-    return (chip != NULL) ? chip->currentTime : 0U;
+    return (chip != NULL) ? chip->metadata.currentTime : 0U;
 }
 
 /* ------------------------------------------------------------------------> */
@@ -416,6 +443,12 @@ static void dzChipDecodeCommand(dzChip *chip, dzByte command, dzTimestamp ts) {
 
             break;
 
+        case DZ_CHIP_CMD_READ_0:
+            if (chip->config.isVerbose)
+                DZ_API_INFO("waiting for 5 address cycles\n");
+
+            break;
+
         case DZ_CHIP_CMD_READ_ID:
             if (chip->config.isVerbose)
                 DZ_API_INFO("waiting for 1 address cycle\n");
@@ -446,6 +479,11 @@ static void dzChipWriteAddress(dzChip *chip, dzByte address, dzTimestamp ts) {
 
             break;
 
+        case DZ_CHIP_CMD_READ_0:
+            // TODO: ...
+
+            break;
+
         case DZ_CHIP_CMD_READ_ID:
             chip->addressCycleCount = 0U;
 
@@ -455,7 +493,7 @@ static void dzChipWriteAddress(dzChip *chip, dzByte address, dzTimestamp ts) {
             DZ_API_UNIMPLEMENTED();
     }
 
-    chip->currentTime = ts;
+    chip->metadata.currentTime = ts;
 }
 
 /* ------------------------------------------------------------------------> */
@@ -463,7 +501,7 @@ static void dzChipWriteAddress(dzChip *chip, dzByte address, dzTimestamp ts) {
 /* Performs a "Get Features" operation on `chip`. */
 static void dzChipGetFeatures(dzChip *chip, dzByte *result) {
     // NOTE: Target-level Command
-    if (!chip->isReady) {
+    if (!dzChipIsReady(chip)) {
         if (chip->config.isVerbose)
             DZ_API_WARNING("chip #%lu is busy\n", chip->config.chipId);
 
@@ -487,7 +525,7 @@ static void dzChipGetFeatures(dzChip *chip, dzByte *result) {
     if (chip->config.isVerbose)
         DZ_API_INFO("returned next byte 0x%02X\n", *result);
 
-    chip->currentTime++;
+    chip->metadata.remainingTime = tFEAT;
 }
 
 /* Performs a "Power-On Reset" operation on `chip`. */
@@ -500,28 +538,26 @@ static void dzChipPowerOnReset(dzChip *chip) {
 
         dzDieDecodeCommand(chip->dies[i],
                            DZ_CHIP_CMD_RESET,
-                           chip->currentTime);
+                           chip->metadata.currentTime);
     }
 
-    dzTimestamp elapsedTime = 0U;
+    dzTimestamp remainingTime = 0U;
 
     for (dzByte i = 0U; i < chip->config.dieCount; i++) {
-        dzTimestamp tRST = dzDieWaitUntilRDY(chip->dies[i]);
+        dzTimestamp tRST = dzDieWaitUntilReady(chip->dies[i]);
 
-        if (elapsedTime < tRST) elapsedTime = tRST;
+        if (remainingTime < tRST) remainingTime = tRST;
     }
 
-    chip->currentTime += elapsedTime;
+    (void) dzChipWaitUntilReady(chip);
 
     chip->state = DZ_CHIP_STATE_IDLE;
-
-    (void) dzChipIsReady(chip);
 }
 
 /* Performs a "Read ID" operation on `chip`. */
 static void dzChipReadID(dzChip *chip, dzByte *result) {
     // NOTE: Target-level Command
-    if (!chip->isReady) {
+    if (!dzChipIsReady(chip)) {
         if (chip->config.isVerbose)
             DZ_API_WARNING("chip #%lu is busy\n", chip->config.chipId);
 
@@ -549,13 +585,17 @@ static void dzChipReadID(dzChip *chip, dzByte *result) {
             DZ_API_INFO("returned next ONFI signature byte 0x%02X ('%c')\n",
                         *result,
                         *result);
+    } else {
+        if (chip->config.isVerbose)
+            DZ_API_WARNING("ignored invalid request with address 0x%02X\n",
+                           chip->address[0]);
     }
 }
 
 /* Performs a "Reset" operation on `chip`. */
 static void dzChipReset(dzChip *chip, dzTimestamp ts) {
     // NOTE: Target-level Command
-    if (!chip->isReady) {
+    if (!dzChipIsReady(chip)) {
         if (chip->config.isVerbose)
             DZ_API_WARNING("chip #%lu is busy\n", chip->config.chipId);
 

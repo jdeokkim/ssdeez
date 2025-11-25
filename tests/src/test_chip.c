@@ -29,11 +29,11 @@
 
 // NOTE: MT29F1G08A
 static const dzDieConfig dieConfig = { .cellType = DZ_CELL_TYPE_SLC,
-                                       .badBlockRatio = 0.01,
+                                       .badBlockRatio = 0.01f,
                                        .planeCountPerDie = 2U,
                                        .blockCountPerPlane = 512U,
                                        .pageCountPerBlock = 64U,
-                                       .pageSizeInBytes = 2048 };
+                                       .pageSizeInBytes = 2048U };
 
 /* Private Variables ======================================================> */
 
@@ -43,7 +43,7 @@ static dzChipConfig chipConfig = {
     .dieConfig = dieConfig, 
     .chipId = 0U, 
     .dieCount = 2U, 
-    .isVerbose = false
+    .isVerbose = true
 };
 
 // clang-format on
@@ -56,6 +56,7 @@ static void dzTestSetupCb(void *ctx);
 static void dzTestTeardownCb(void *ctx);
 
 TEST dzTestChipGetFeatures(void);
+TEST dzTestChipRead(void);
 TEST dzTestChipReadID(void);
 TEST dzTestChipReset(void);
 
@@ -66,6 +67,7 @@ SUITE(dzTestChip) {
     SET_TEARDOWN(dzTestTeardownCb, NULL);
 
     RUN_TEST(dzTestChipGetFeatures);
+    RUN_TEST(dzTestChipRead);
     RUN_TEST(dzTestChipReadID);
     RUN_TEST(dzTestChipReset);
 }
@@ -137,6 +139,27 @@ TEST dzTestChipReset(void) {
         dzChipWrite(chip, DZ_CHIP_CMD_RESET, 100U);
 
         ASSERT_EQ(dzChipGetRB(chip), 0U);
+    }
+
+    PASS();
+}
+
+TEST dzTestChipRead(void) {
+    ASSERT_NEQ(chip, NULL);
+
+    {
+        dzChipSetCLE(chip, 1U);
+        dzChipToggleWE(chip);
+
+        dzChipWrite(chip, DZ_CHIP_CMD_READ_0, 100U);
+
+        // NOTE: LUN #0, Block #0, Page #0, Offset #0
+        for (int i = 0; i < 5; i++) {
+            dzChipSetALE(chip, 1U);
+            dzChipToggleWE(chip);
+
+            dzChipWrite(chip, 0x00U, 250U);
+        }
     }
 
     PASS();

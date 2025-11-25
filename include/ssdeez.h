@@ -97,11 +97,7 @@ extern "C" {
 /* ------------------------------------------------------------------------> */
 
 /* Represents the current API version of SSDeez. */
-#define DZ_API_VERSION             "0.0.1"
-
-/* Macro-defined Constants ================================================> */
-
-// TODO: ...
+#define DZ_API_VERSION       "0.0.1"
 
 /* Typedefs ===============================================================> */
 
@@ -222,12 +218,12 @@ typedef dzByteArray dzPage;
 /* A structure that represents the configuration of a NAND flash die. */
 typedef struct dzDieConfig_ {
     dzID dieId;
-    dzF64 badBlockRatio;
+    dzF32 badBlockRatio;
     dzCellType cellType;
-    dzU32 planeCountPerDie;
-    dzU32 blockCountPerPlane;
-    dzU32 pageCountPerBlock;
-    dzU32 pageSizeInBytes;
+    dzU16 planeCountPerDie;
+    dzU16 blockCountPerPlane;
+    dzU16 pageCountPerBlock;
+    dzU16 pageSizeInBytes;
 } dzDieConfig;
 
 /* A structure that represents a NAND flash die. */
@@ -266,6 +262,9 @@ void dzChipRead(dzChip *chip, dzByte *data, dzTimestamp ts);
 
 /* Writes `data` to `chip`'s I/O bus. */
 void dzChipWrite(dzChip *chip, dzByte data, dzTimestamp ts);
+
+/* Waits until `chip` is ready. */
+dzTimestamp dzChipWaitUntilReady(dzChip *chip);
 
 /* ------------------------------------------------------------------------> */
 
@@ -319,12 +318,12 @@ void dzDieDeinit(dzDie *die);
 /* Performs `command` on `die`. */
 void dzDieDecodeCommand(dzDie *die, dzByte command, dzTimestamp ts);
 
-/* Waits until the `die`'s "Ready" status bit is set. */
-dzTimestamp dzDieWaitUntilRDY(dzDie *die);
+/* Waits until the `die`'s "RDY" status bit is set. */
+dzTimestamp dzDieWaitUntilReady(dzDie *die);
 
 /* ------------------------------------------------------------------------> */
 
-/* Returns the "Ready" status bit of `die`. */
+/* Returns the "RDY" status bit of `die`. */
 dzByte dzDieGetRDY(const dzDie *die);
 
 /* <----------------------------------------------------------- [src/page.c] */
@@ -377,39 +376,44 @@ DZ_API_INLINE dzF64 dzUtilsClampF64(dzF64 value, dzF64 low, dzF64 high) {
     return (value >= low) ? ((value <= high) ? value : high) : low;
 }
 
-/* Returns the number of trailing zero-bits in `x`. */
-DZ_API_INLINE dzU32 dzUtilsCtz(dzU32 x) {
-    if (x == 0U) return UINT32_MAX;
+/* Returns the number of leading zero-bits in `x`. */
+DZ_API_INLINE dzByte dzUtilsClz(dzU32 x) {
+    /* clang-format off */
 
-        // clang-format off
+    if (x == 0U) return UCHAR_MAX;
 
 #if defined(_MSC_VER)
     #if defined(__ARM_ARCH)
-        return _CountTrailingZeros(x);
+        return _CountLeadingZeros(x);
     #elif defined(__BMI__)
-        return _tzcnt_u32(x);
+        return _lzcnt_u32(x);
     #else
         dzU32 result;
 
-        return _BitScanForward(&result, x) ? result : UINT32_MAX;
+        return _BitScanReverse(&result, x) 
+            ? (dzByte) (31U - result)
+            : UINT32_MAX;
     #endif
 #elif defined(__GNUC__)
-    return (dzU32) __builtin_ctz(x);
+    return (dzByte) __builtin_clz(x);
 #else
-    x &= -((dzI32) x);
+    dzU32 result = 0U;
 
-    dzU32 result = ((sizeof result) << 3U) - 1U;
-
-    if (x & 0x0000FFFFU) result -= 16U;
-    if (x & 0x00FF00FFU) result -= 8U;
-    if (x & 0x0F0F0F0FU) result -= 4U;
-    if (x & 0x33333333U) result -= 2U;
-    if (x & 0x55555555U) result -= 1U;
+    if (!(x & 0xFFFF0000U)) result += 16U, x <<= 16U;
+    if (!(x & 0xFF000000U)) result += 8U, x <<= 8U;
+    if (!(x & 0xF0000000U)) result += 4U, x <<= 4U;
+    if (!(x & 0xC0000000U)) result += 2U, x <<= 2U;
+    if (!(x & 0x80000000U)) result += 1U;
 
     return result;
 #endif
 
-    // clang-format on
+    /* clang-format on */
+}
+
+/* Returns the minimum number of bits required to represent `x`. */
+DZ_API_INLINE dzByte dzUtilsGetBitCount(dzU32 x) {
+    return (dzByte) (32U - dzUtilsClz(x));
 }
 
 /* ========================================================================> */
