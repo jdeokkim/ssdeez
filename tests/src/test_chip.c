@@ -127,23 +127,6 @@ TEST dzTestChipGetFeatures(void) {
     PASS();
 }
 
-TEST dzTestChipReset(void) {
-    ASSERT_NEQ(chip, NULL);
-
-    {
-        ASSERT_EQ(dzChipGetRB(chip), 1U);
-
-        dzChipSetCLE(chip, 1U);
-        dzChipToggleWE(chip);
-
-        dzChipWrite(chip, DZ_CHIP_CMD_RESET, 100U);
-
-        ASSERT_EQ(dzChipGetRB(chip), 0U);
-    }
-
-    PASS();
-}
-
 TEST dzTestChipRead(void) {
     ASSERT_NEQ(chip, NULL);
 
@@ -153,13 +136,19 @@ TEST dzTestChipRead(void) {
 
         dzChipWrite(chip, DZ_CHIP_CMD_READ_0, 100U);
 
-        // NOTE: LUN #0, Block #0, Page #0, Offset #0
-        for (int i = 0; i < 5; i++) {
-            dzChipSetALE(chip, 1U);
+        dzChipSetALE(chip, 1U);
+
+        // NOTE: Die #0, Block #0, Page #0, Offset #0
+        for (dzByte i = 0U; i < 5U; i++) {
             dzChipToggleWE(chip);
 
-            dzChipWrite(chip, 0x00U, 250U);
+            dzChipWrite(chip, 0x00U, 150U + (i * 50U));
         }
+
+        dzChipSetCLE(chip, 1U);
+        dzChipToggleWE(chip);
+
+        dzChipWrite(chip, DZ_CHIP_CMD_READ_1, 450U);
     }
 
     PASS();
@@ -227,6 +216,23 @@ TEST dzTestChipReadID(void) {
         dzChipRead(chip, &data, 1100U);
 
         ASSERT_EQ(data, 0x00U);
+    }
+
+    PASS();
+}
+
+TEST dzTestChipReset(void) {
+    ASSERT_NEQ(chip, NULL);
+
+    {
+        ASSERT_EQ(dzChipGetRB(chip), 1U);
+
+        dzChipSetCLE(chip, 1U);
+        dzChipToggleWE(chip);
+
+        dzChipWrite(chip, DZ_CHIP_CMD_RESET, 100U);
+
+        ASSERT_EQ(dzChipGetRB(chip), 0U);
     }
 
     PASS();

@@ -327,7 +327,7 @@ dzByte dzDieGetRDY(const dzDie *die) {
 /* Initializes the metadata of `die`. */
 static dzBool dzDieInitMetadata(dzDie *die) {
     die->metadata.blockCountPerDie = die->config.planeCountPerDie
-                                     * (dzU64) die->config.blockCountPerPlane;
+                                     * (dzU32) die->config.blockCountPerPlane;
 
     die->metadata.pageCountPerDie = die->metadata.blockCountPerDie
                                     * die->config.pageCountPerBlock;

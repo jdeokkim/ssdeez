@@ -52,6 +52,8 @@ typedef struct dzChipCtrlLines_ {
 typedef struct dzChipMetadata_ {
     dzTimestamp currentTime;
     dzTimestamp remainingTime;
+    dzByte columnAddressSize;
+    dzByte rowAddressSize;
 } dzChipMetadata;
 
 /* A structure that represents a NAND flash chip. */
@@ -59,8 +61,7 @@ struct dzChip_ {
     dzChipConfig config;
     dzChipCommand command;
     dzChipMetadata metadata;
-    dzByte address[7];
-    dzByte addressCycleCount;
+    dzByteStream addresses;
     dzDie **dies;
     dzChipCtrlLines lines;
     dzByte isReady;                          // R/B# (`0U` = BUSY)
@@ -84,6 +85,9 @@ static const dzU16 tFEAT = 1U;
 
 /* ONFI signature bytes. */
 static const dzByte onfiSignature[] = { 'O', 'N', 'F', 'I' };
+
+/* Maximum number of the address cycles. */
+static const dzUSize maxAddressCycleCount = 6U;
 
 /* Private Variables ======================================================> */
 
@@ -153,29 +157,70 @@ dzResult dzChipInit(dzChip **chip, dzChipConfig config) {
 
     // clang-format on
 
+    dzU32 blockCountPerDie = config.dieConfig.planeCountPerDie
+                             * (dzU32) config.dieConfig.blockCountPerPlane;
+
+    dzByte columnAddressSize = dzUtilsGetColumnAddressSize(
+        config.dieConfig.pageSizeInBytes);
+
+    dzByte rowAddressSize = dzUtilsGetRowAddressSize(
+        config.dieCount, blockCountPerDie, config.dieConfig.pageCountPerBlock);
+
+    {
+        if (columnAddressSize + rowAddressSize > maxAddressCycleCount) {
+            if (config.isVerbose) {
+                DZ_API_ERROR("total number of address cycles must not "
+                             "exceed %lu\n",
+                             maxAddressCycleCount);
+            }
+
+            return DZ_RESULT_INVALID_ARGUMENT;
+        }
+    }
+
     dzChip *newChip = malloc(sizeof *newChip);
 
     if (newChip == NULL) return DZ_RESULT_OUT_OF_MEMORY;
 
-    {
-        if (config.isVerbose)
-            DZ_API_INFO("initializing chip #%lu\n", config.chipId);
+    if (config.isVerbose)
+        DZ_API_INFO("initializing chip #%lu\n", config.chipId);
 
+    {
         newChip->config = config;
 
         newChip->command = DZ_CHIP_CMD_UNKNOWN;
 
+        newChip->addresses.size = maxAddressCycleCount;
+        newChip->addresses.offset = 0U;
+
+        newChip->addresses.ptr = malloc(newChip->addresses.size
+                                        * sizeof *(newChip->addresses.ptr));
+
+        newChip->lines = (dzChipCtrlLines) { .addrLatchEnable = 0U,
+                                             .cmdLatchEnable = 0U,
+                                             .chipEnable = 1U,
+                                             .readEnable = 1U,
+                                             .writeEnable = 1U,
+                                             .writeProtect = 1U };
+
+        newChip->isReady = 1U;
+        newChip->offset = 0U;
+
+        newChip->state = DZ_CHIP_STATE_IDLE;
+
+        newChip->dieIndex = 0U;
+        newChip->timingMode = 0U;
+    }
+
+    {
         newChip->metadata.currentTime = 1U;
         newChip->metadata.remainingTime = 0U;
 
-        dzUSize byteCount = sizeof newChip->address
-                            / sizeof *(newChip->address);
+        newChip->metadata.columnAddressSize = columnAddressSize;
+        newChip->metadata.rowAddressSize = rowAddressSize;
+    }
 
-        for (dzUSize i = 0U; i < byteCount; i++)
-            newChip->address[i] = 0U;
-
-        newChip->addressCycleCount = 0U;
-
+    {
         newChip->dies = malloc(config.dieCount * sizeof *(newChip->dies));
 
         for (dzU32 i = 0U; i < config.dieCount; i++) {
@@ -192,21 +237,6 @@ dzResult dzChipInit(dzChip **chip, dzChipConfig config) {
                 return dieInitResult;
             }
         }
-
-        newChip->lines = (dzChipCtrlLines) { .addrLatchEnable = 0U,
-                                             .cmdLatchEnable = 0U,
-                                             .chipEnable = 1U,
-                                             .readEnable = 1U,
-                                             .writeEnable = 1U,
-                                             .writeProtect = 1U };
-
-        newChip->isReady = 1U;
-        newChip->offset = 0U;
-
-        newChip->state = DZ_CHIP_STATE_IDLE;
-
-        newChip->dieIndex = 0U;
-        newChip->timingMode = 0U;
 
         dzChipPowerOnReset(newChip);
     }
@@ -228,7 +258,7 @@ void dzChipDeinit(dzChip *chip) {
     for (dzU32 i = 0; i < chip->config.dieCount; i++)
         dzDieDeinit(chip->dies[i]);
 
-    free(chip->dies), free(chip);
+    free(chip->addresses.ptr), free(chip->dies), free(chip);
 }
 
 /* Reads `data` from `chip`'s I/O bus. */
@@ -426,8 +456,6 @@ void dzChipSetWP(dzChip *chip, dzByte state) {
 
 /* Performs `command` on `chip`. */
 static void dzChipDecodeCommand(dzChip *chip, dzByte command, dzTimestamp ts) {
-    chip->command = command;
-
     if (chip->config.isVerbose)
         DZ_API_INFO("decoded ONFI command 0x%02X\n", command);
 
@@ -445,7 +473,25 @@ static void dzChipDecodeCommand(dzChip *chip, dzByte command, dzTimestamp ts) {
 
         case DZ_CHIP_CMD_READ_0:
             if (chip->config.isVerbose)
-                DZ_API_INFO("waiting for 5 address cycles\n");
+                DZ_API_INFO("waiting for %u address cycles\n",
+                            chip->metadata.columnAddressSize
+                                + chip->metadata.rowAddressSize);
+
+            break;
+
+        case DZ_CHIP_CMD_READ_1:
+            if (chip->command != DZ_CHIP_CMD_READ_0) {
+                if (chip->config.isVerbose) {
+                    DZ_API_WARNING(
+                        "0x%02X must be preceded by 0x%02X first;\n",
+                        command,
+                        DZ_CHIP_CMD_READ_0);
+
+                    DZ_API_WARNING("ignoring command 0x%02X\n", command);
+                }
+
+                return;
+            }
 
             break;
 
@@ -458,34 +504,44 @@ static void dzChipDecodeCommand(dzChip *chip, dzByte command, dzTimestamp ts) {
         default:
             DZ_API_UNIMPLEMENTED();
     }
+
+    chip->command = command;
 }
 
 /* Writes `address` to `chip`'s address register. */
 static void dzChipWriteAddress(dzChip *chip, dzByte address, dzTimestamp ts) {
-    if (chip->addressCycleCount
-        >= (sizeof chip->address / sizeof *(chip->address)))
-        return;
+    if (chip->addresses.offset >= chip->addresses.size) return;
 
     if (chip->config.isVerbose)
         DZ_API_INFO("received address 0x%02X\n", address);
 
-    chip->address[chip->addressCycleCount++] = address;
+    chip->addresses.ptr[chip->addresses.offset++] = address;
 
     switch (chip->command) {
         case DZ_CHIP_CMD_GET_FEATURES:
-            chip->addressCycleCount = 0U;
+            chip->addresses.offset = 0U;
 
             chip->state = DZ_CHIP_STATE_GF_RETRIEVE_PARAMS;
 
             break;
 
         case DZ_CHIP_CMD_READ_0:
-            // TODO: ...
+            if (chip->config.isVerbose) {
+                if (chip->addresses.offset
+                    <= chip->metadata.columnAddressSize) {
+                    DZ_API_INFO("=> column address #%lu\n",
+                                chip->addresses.offset);
+                } else {
+                    DZ_API_INFO("=> row address #%lu\n",
+                                chip->addresses.offset
+                                    - chip->metadata.columnAddressSize);
+                }
+            }
 
             break;
 
         case DZ_CHIP_CMD_READ_ID:
-            chip->addressCycleCount = 0U;
+            chip->addresses.offset = 0U;
 
             break;
 
@@ -508,7 +564,7 @@ static void dzChipGetFeatures(dzChip *chip, dzByte *result) {
         return;
     }
 
-    if (chip->address[0] == 0x01U) {
+    if (chip->addresses.ptr[0] == 0x01U) {
         if (chip->offset >= 4U) {
             *result = 0xFFU;
 
@@ -564,13 +620,13 @@ static void dzChipReadID(dzChip *chip, dzByte *result) {
         return;
     }
 
-    if (chip->address[0] == 0x00U) {
+    if (chip->addresses.ptr[0] == 0x00U) {
         // NOTE: JEDEC Manufacturer ID and Device ID
         *result = 0x00U;
 
         if (chip->config.isVerbose)
             DZ_API_INFO("returned next byte 0x%02X\n", *result);
-    } else if (chip->address[0] == 0x20U) {
+    } else if (chip->addresses.ptr[0] == 0x20U) {
         if (chip->offset >= sizeof onfiSignature / sizeof *onfiSignature) {
             *result = 0xFFU;
 
@@ -588,7 +644,7 @@ static void dzChipReadID(dzChip *chip, dzByte *result) {
     } else {
         if (chip->config.isVerbose)
             DZ_API_WARNING("ignored invalid request with address 0x%02X\n",
-                           chip->address[0]);
+                           chip->addresses.ptr[0]);
     }
 }
 

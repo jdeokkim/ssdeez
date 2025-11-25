@@ -416,6 +416,24 @@ DZ_API_INLINE dzByte dzUtilsGetBitCount(dzU32 x) {
     return (dzByte) (32U - dzUtilsClz(x));
 }
 
+/* Returns the number of bytes required to represent a column address. */
+DZ_API_INLINE dzByte dzUtilsGetColumnAddressSize(dzU16 pageSizeInBytes) {
+    dzByte bitCount = dzUtilsGetBitCount(pageSizeInBytes);
+
+    return (dzByte) ((bitCount + (dzByte) 7U) >> 3U);
+}
+
+/* Returns the number of bytes required to represent a row address. */
+DZ_API_INLINE dzByte dzUtilsGetRowAddressSize(dzByte dieCount,
+                                              dzU32 blockCountPerDie,
+                                              dzU16 pageCountPerBlock) {
+    dzByte bitCount = (dzByte) (dzUtilsGetBitCount(dieCount)
+                                + dzUtilsGetBitCount(blockCountPerDie)
+                                + dzUtilsGetBitCount(pageCountPerBlock));
+
+    return (dzByte) ((bitCount + (dzByte) 7U) >> 3U);
+}
+
 /* ========================================================================> */
 
 #ifdef __cplusplus
