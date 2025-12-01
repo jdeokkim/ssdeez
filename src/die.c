@@ -77,6 +77,7 @@ struct dzDie_ {
     dzDieConfig config;
     dzByte *buffer;
     dzDieState state;
+    dzU16 columnOffset;
     dzByte status;
 };
 
@@ -146,16 +147,16 @@ static const dzU16 tBERSTable[DZ_CELL_TYPE_COUNT_] = {
 /* ------------------------------------------------------------------------> */
 
 /* Standard deviation ratio for "page program time". */
-static const dzF32 tPROGSigmaRatio = 0.01f;
+static const dzF64 tPROGSigmaRatio = 0.01f;
 
 /* Standard deviation ratio for "page read time". */
-static const dzF32 tRSigmaRatio = 0.025f;
+static const dzF64 tRSigmaRatio = 0.025f;
 
 /* Standard deviation ratio for "reset time". */
-static const dzF32 tRSTSigmaRatio = 0.075f;
+static const dzF64 tRSTSigmaRatio = 0.075f;
 
 /* Standard deviation ratio for "block erase time". */
-static const dzF32 tBERSSigmaRatio = 0.05f;
+static const dzF64 tBERSSigmaRatio = 0.05f;
 
 /* Private Variables ======================================================> */
 
@@ -234,7 +235,7 @@ dzResult dzDieInit(dzDie **die, dzDieConfig config) {
 
     if (newDie == NULL) return DZ_RESULT_OUT_OF_MEMORY;
 
-    if (config.isVerbose) DZ_API_INFO("initializing die #%lu\n", config.dieId);
+    if (config.isVerbose) DZ_API_INFO("initializing die #%u\n", config.dieId);
 
     newDie->stats = (dzDieStats) { .totalProgramLatency = 0U,
                                    .totalProgramCount = 0U,
@@ -285,7 +286,7 @@ void dzDieDeinit(dzDie *die) {
     if (die == NULL) return;
 
     if (die->config.isVerbose)
-        DZ_API_INFO("deinitializing die #%lu\n", die->config.dieId);
+        DZ_API_INFO("deinitializing die #%u\n", die->config.dieId);
 
     free(die->buffer), free(die);
 }
@@ -302,7 +303,7 @@ void dzDieDecodeCommand(dzDie *die, dzByte command, dzTimestamp ts) {
 
     if (!isAcceptableWhileBusy && !(die->status & DZ_DIE_STATUS_RDY)) {
         if (die->config.isVerbose)
-            DZ_API_INFO("die #%lu is not ready yet\n", die->config.dieId);
+            DZ_API_INFO("die #%u is not ready yet\n", die->config.dieId);
 
         dzTimestamp elapsedTime = ts - die->metadata.currentTime;
 
@@ -335,7 +336,7 @@ dzTimestamp dzDieWaitUntilReady(dzDie *die) {
     dzTimestamp result = die->metadata.remainingTime;
 
     if (die->config.isVerbose)
-        DZ_API_INFO("die #%lu: waiting for %lu us until ready\n",
+        DZ_API_INFO("die #%u: waiting for %lu us until ready\n",
                     die->config.dieId,
                     result);
 
@@ -379,29 +380,29 @@ static dzBool dzDieInitMetadata(dzDie *die) {
 
     {
         dzU32 tPROGMu = tPROGTable[die->config.cellType];
-        dzF32 tPROGSigma = tPROGSigmaRatio * (dzF32) tPROGMu;
+        dzF64 tPROGSigma = tPROGSigmaRatio * tPROGMu;
 
-        if (tPROGSigma <= 0.0f) return false;
+        if (tPROGSigma <= 0.0) return false;
 
-        die->metadata.maxProgramTime = tPROGMu + (dzU32) (3.0f * tPROGSigma);
+        die->metadata.maxProgramTime = tPROGMu + (dzU32) (3.0 * tPROGSigma);
     }
 
     {
         dzU32 tRMu = tRTable[die->config.cellType];
-        dzF32 tRSigma = tRSigmaRatio * (dzF32) tRMu;
+        dzF64 tRSigma = tRSigmaRatio * tRMu;
 
-        if (tRSigma <= 0.0f) return false;
+        if (tRSigma <= 0.0) return false;
 
-        die->metadata.maxProgramTime = tRMu + (dzU32) (3.0f * tRSigma);
+        die->metadata.maxProgramTime = tRMu + (dzU32) (3.0 * tRSigma);
     }
 
     {
         dzU32 tBERSMu = tBERSTable[die->config.cellType];
-        dzF32 tBERSSigma = tBERSSigmaRatio * (dzF32) tBERSMu;
+        dzF64 tBERSSigma = tBERSSigmaRatio * tBERSMu;
 
-        if (tBERSSigma <= 0.0f) return false;
+        if (tBERSSigma <= 0.0) return false;
 
-        die->metadata.maxProgramTime = tBERSMu + (dzU32) (3.0f * tBERSSigma);
+        die->metadata.maxProgramTime = tBERSMu + (dzU32) (3.0 * tBERSSigma);
     }
 
     return true;
@@ -440,25 +441,24 @@ static dzBool dzDieCorruptRandomBlocks(dzDie *die) {
 
     if (die->config.badBlockRatio <= 0.0f) return true;
 
-    dzF32 badBlockCountAsF32 = die->config.badBlockRatio
-                               * (dzF32) blockCountPerDie;
+    dzF32 badBlockCountF32 = die->config.badBlockRatio
+                             * (dzF32) blockCountPerDie;
 
-    dzU32 badBlockCount = (dzU32) badBlockCountAsF32;
+    dzU32 badBlockCount = (dzU32) badBlockCountF32;
 
-    if ((badBlockCountAsF32 - (dzU32) badBlockCountAsF32) > 0.0f)
-        badBlockCount++;
+    if ((badBlockCountF32 - (dzU32) badBlockCountF32) > 0.0f) badBlockCount++;
 
     // NOTE: Block #0 is always guaranteed to be a 'good' block
-    dzID blockIndex = dzUtilsRandRange(1U, blockCountPerDie - 1U);
+    dzID blockIndex = (dzID) dzUtilsRandRange(1U, blockCountPerDie - 1U);
 
     while (badBlockCount > 0U) {
         if (!dzDieMarkBlockAsDefective(die, blockIndex)) return false;
 
-        dzU64 newBlockIndex = dzDieGetAdjacentBlockIndex(die, blockIndex);
+        dzID newBlockIndex = dzDieGetAdjacentBlockIndex(die, blockIndex);
 
         // NOTE: Corruption may or may not spread within an one-block radius
         if ((dzUtilsRand() & 1U) || newBlockIndex == DZ_API_INVALID_ID)
-            blockIndex = dzUtilsRandRange(1U, blockCountPerDie - 1U);
+            blockIndex = (dzID) dzUtilsRandRange(1U, blockCountPerDie - 1U);
         else
             blockIndex = newBlockIndex;
 
@@ -556,15 +556,17 @@ static void dzDieReset(dzDie *die) {
         die->status &= (dzByte) ~DZ_DIE_STATUS_RDY;
 
         if (die->config.isVerbose)
-            DZ_API_INFO("cleared die #%lu's RDY status bit\n",
+            DZ_API_INFO("cleared die #%u's RDY status bit\n",
                         die->config.dieId);
 
         die->state = DZ_DIE_STATE_RST_EXECUTE;
 
+        dzF64 tRSTMu = tRST0Table[die->config.cellType];
+        dzF64 tRSTSigma = tRSTSigmaRatio * tRSTMu;
+
         // TODO: ...
-        die->metadata.remainingTime = (dzU64)
-            dzUtilsGaussian((dzF64) tRST0Table[die->config.cellType],
-                            tRSTSigmaRatio);
+        die->metadata.remainingTime = (dzU64) dzUtilsGaussian(tRSTMu,
+                                                              tRSTSigma);
 
         DZ_API_UNUSED_VARIABLE(tRST1Table);
         DZ_API_UNUSED_VARIABLE(tRST2Table);
@@ -573,7 +575,7 @@ static void dzDieReset(dzDie *die) {
         die->status |= DZ_DIE_STATUS_RDY;
 
         if (die->config.isVerbose)
-            DZ_API_INFO("set die #%lu's RDY status bit\n", die->config.dieId);
+            DZ_API_INFO("set die #%u's RDY status bit\n", die->config.dieId);
 
         die->state = DZ_DIE_STATE_IDLE;
 

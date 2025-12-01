@@ -37,7 +37,7 @@
 /* Constants ==============================================================> */
 
 /* A constant that represents an invalid identifier. */
-const dzID DZ_API_INVALID_ID = UINT64_MAX;
+const dzID DZ_API_INVALID_ID = UINT32_MAX;
 
 /* Private Variables ======================================================> */
 
@@ -122,6 +122,39 @@ void dzUtilsSrand(dzU64 seed) {
 
     for (int i = 0, j = sizeof prngStates / sizeof *prngStates; i < j; i++)
         prngStates[i] = dzUtilsSplitMix64();
+}
+
+/* ------------------------------------------------------------------------> */
+
+/* 
+    Reads `bitCount` (up to `sizeof(*result) * CHAR_BIT`) bits 
+    starting from the `bitOffset`-th bit of `bytes`.
+*/
+void dzUtilsReadBitsFromBytes(const dzByteArray bytes,
+                              dzUSize bitOffset,
+                              dzUSize bitCount,
+                              dzU64 *result) {
+    if (bytes.ptr == NULL || bytes.size == 0U || bitCount == 0U
+        || bitCount > (CHAR_BIT * sizeof(*result)) || result == NULL)
+        return;
+
+    dzUSize startBitOffset = bitOffset;
+    dzUSize endBitOffset = bitOffset + (bitCount - 1U);
+
+    if (startBitOffset >= (CHAR_BIT * bytes.size)
+        || endBitOffset >= (CHAR_BIT * bytes.size))
+        return;
+
+    *result = 0U;
+
+    for (dzUSize i = startBitOffset; i <= endBitOffset; i++) {
+        dzByte shiftAmount = (CHAR_BIT - 1U) - (i % CHAR_BIT);
+
+        dzByte bit = (dzByte) ((bytes.ptr[i / CHAR_BIT] >> shiftAmount)
+                               & (dzByte) 1U);
+
+        *result <<= 1U, *result |= bit;
+    }
 }
 
 /* Private Functions ======================================================> */

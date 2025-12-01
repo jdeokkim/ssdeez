@@ -40,6 +40,7 @@
 
 TEST dzTestGaussian(void);
 TEST dzTestRandRange(void);
+TEST dzTestReadBitsFromBytes(void);
 TEST dzTestInlineFunctions(void);
 
 /* Public Functions =======================================================> */
@@ -47,6 +48,7 @@ TEST dzTestInlineFunctions(void);
 SUITE(dzTestUtils) {
     RUN_TEST(dzTestGaussian);
     RUN_TEST(dzTestRandRange);
+    RUN_TEST(dzTestReadBitsFromBytes);
     RUN_TEST(dzTestInlineFunctions);
 }
 
@@ -120,6 +122,71 @@ TEST dzTestRandRange(void) {
             ASSERT_GT(dzUtilsRandRangeF64(minValue, maxValue), minValue);
             ASSERT_LT(dzUtilsRandRangeF64(maxValue, minValue), maxValue);
         }
+    }
+
+    PASS();
+}
+
+TEST dzTestReadBitsFromBytes(void) {
+    dzByte bytes[] = { 0x12, 0x34, 0x56, 0x78 };
+
+    dzByteArray byteArray = { .ptr = bytes,
+                              .size = sizeof bytes / sizeof *bytes };
+
+    dzU64 value = UINT64_MAX;
+
+    {
+        dzUtilsReadBitsFromBytes(byteArray, 0U, 1U, NULL);
+
+        ASSERT_EQ(value, UINT64_MAX);
+
+        dzUtilsReadBitsFromBytes(byteArray, 0U, 0U, &value);
+
+        ASSERT_EQ(value, UINT64_MAX);
+
+        dzUtilsReadBitsFromBytes(byteArray, 31U, 0U, &value);
+
+        ASSERT_EQ(value, UINT64_MAX);
+
+        dzUtilsReadBitsFromBytes(byteArray, 31U, 1U, &value);
+
+        ASSERT_EQ(value, 0x00U);
+    }
+
+    {
+        dzUtilsReadBitsFromBytes(byteArray, 0U, 4U, &value);
+
+        ASSERT_EQ(value, 0x01U);
+
+        dzUtilsReadBitsFromBytes(byteArray, 0U, 7U, &value);
+
+        ASSERT_EQ(value, 0x09U);
+
+        dzUtilsReadBitsFromBytes(byteArray, 0U, 8U, &value);
+
+        ASSERT_EQ(value, 0x12U);
+
+        dzUtilsReadBitsFromBytes(byteArray, 0U, 10U, &value);
+
+        ASSERT_EQ(value, 0x48U);
+    }
+
+    {
+        dzUtilsReadBitsFromBytes(byteArray, 10U, 4U, &value);
+
+        ASSERT_EQ(value, 0x0DU);
+
+        dzUtilsReadBitsFromBytes(byteArray, 10U, 8U, &value);
+
+        ASSERT_EQ(value, 0xD1U);
+
+        dzUtilsReadBitsFromBytes(byteArray, 10U, 9U, &value);
+
+        ASSERT_EQ(value, 0x01A2U);
+
+        dzUtilsReadBitsFromBytes(byteArray, 10U, 13U, &value);
+
+        ASSERT_EQ(value, 0x1A2BU);
     }
 
     PASS();

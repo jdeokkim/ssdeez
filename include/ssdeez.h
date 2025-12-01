@@ -129,7 +129,7 @@ typedef char *dzString;
 typedef dzU64 dzTimestamp;
 
 /* The identifier of a page, a block, a plane, a die, or a chip. */
-typedef dzU64 dzID;
+typedef dzU32 dzID;
 
 // clang-format on
 
@@ -274,38 +274,38 @@ dzTimestamp dzChipGetCurrentTime(const dzChip *chip);
 
 /* ------------------------------------------------------------------------> */
 
-/* Returns the state of the "Address Latch Enable" control line in `chip`. */
+/* Returns the state of the "Address Latch Enable (ALE)" line in `chip`. */
 dzByte dzChipGetALE(const dzChip *chip);
 
-/* Returns the state of the "Command Latch Enable" control line in `chip`. */
+/* Returns the state of the "Command Latch Enable (CLE)" line in `chip`. */
 dzByte dzChipGetCLE(const dzChip *chip);
 
-/* Returns the state of the "Chip Enable" control line in `chip`. */
+/* Returns the state of the "Chip Enable (CE#)" line in `chip`. */
 dzByte dzChipGetCE(const dzChip *chip);
 
-/* Returns the state of the "Ready/Busy" control line in `chip`. */
+/* Returns the state of the "Ready/Busy (R/B#)" line in `chip`. */
 dzByte dzChipGetRB(const dzChip *chip);
 
 /* ------------------------------------------------------------------------> */
 
-/* Sets the state of the "Address Latch Enable" control line in `die`. */
+/* Sets the state of the "Address Latch Enable (ALE)" line in `die`. */
 void dzChipSetALE(dzChip *chip, dzByte state);
 
-/* Sets the state of the "Command Latch Enable" control line in `chip`. */
+/* Sets the state of the "Command Latch Enable (CLE)" line in `chip`. */
 void dzChipSetCLE(dzChip *chip, dzByte state);
 
-/* Sets the state of the "Chip Enable" control line in `chip`. */
+/* Sets the state of the "Chip Enable (CE#)" line in `chip`. */
 void dzChipSetCE(dzChip *chip, dzByte state);
 
-/* Sets the state of the "Write Protect" control line in `chip`. */
+/* Sets the state of the "Write Protect (WP#)" line in `chip`. */
 void dzChipSetWP(dzChip *chip, dzByte state);
 
 /* ------------------------------------------------------------------------> */
 
-/* Toggles the state of the "Read Enable" control line in `chip`. */
+/* Toggles the state of the "Read Enable (RE#)" line in `chip`. */
 void dzChipToggleRE(dzChip *chip);
 
-/* Toggles the state of the "Write Enable" control line in `chip`. */
+/* Toggles the state of the "Write Enable (WE#)" line in `chip`. */
 void dzChipToggleWE(dzChip *chip);
 
 /* <------------------------------------------------------------ [src/die.c] */
@@ -364,6 +364,17 @@ dzF64 dzUtilsRandRangeF64(dzF64 min, dzF64 max);
 /* Seeds the pseudo-random number generator. */
 void dzUtilsSrand(dzU64 seed);
 
+/* ------------------------------------------------------------------------> */
+
+/* 
+    Reads `bitCount` (up to `sizeof(*result) * CHAR_BIT`) bits 
+    starting from the `bitOffset`-th bit of `bytes`.
+*/
+void dzUtilsReadBitsFromBytes(const dzByteArray bytes,
+                              dzUSize bitOffset,
+                              dzUSize bitCount,
+                              dzU64 *result);
+
 /* Inline Functions =======================================================> */
 
 /* Returns `value` clamped to the inclusive range of `low` and `high`. */
@@ -415,24 +426,6 @@ DZ_API_INLINE dzByte dzUtilsClz(dzU32 x) {
 /* Returns the minimum number of bits required to represent `x`. */
 DZ_API_INLINE dzByte dzUtilsGetBitCount(dzU32 x) {
     return (dzByte) (32U - dzUtilsClz(x));
-}
-
-/* Returns the number of bytes required to represent a column address. */
-DZ_API_INLINE dzByte dzUtilsGetColumnAddressSize(dzU16 pageSizeInBytes) {
-    dzByte bitCount = dzUtilsGetBitCount(pageSizeInBytes);
-
-    return (dzByte) ((bitCount + (dzByte) 7U) >> 3U);
-}
-
-/* Returns the number of bytes required to represent a row address. */
-DZ_API_INLINE dzByte dzUtilsGetRowAddressSize(dzByte dieCount,
-                                              dzU32 blockCountPerDie,
-                                              dzU16 pageCountPerBlock) {
-    dzByte bitCount = (dzByte) (dzUtilsGetBitCount(dieCount)
-                                + dzUtilsGetBitCount(blockCountPerDie)
-                                + dzUtilsGetBitCount(pageCountPerBlock));
-
-    return (dzByte) ((bitCount + (dzByte) 7U) >> 3U);
 }
 
 /* ========================================================================> */

@@ -138,12 +138,20 @@ TEST dzTestChipRead(void) {
 
         dzChipSetALE(chip, 1U);
 
-        // NOTE: Die #0, Block #0, Page #0, Offset #0
-        for (dzByte i = 0U; i < 5U; i++) {
-            dzChipToggleWE(chip);
+        dzChipToggleWE(chip);
+        dzChipWrite(chip, 0x01U, 200U);
 
-            dzChipWrite(chip, 0x00U, 150U + (i * 50U));
-        }
+        dzChipToggleWE(chip);
+        dzChipWrite(chip, 0x00U, 250U);
+
+        dzChipToggleWE(chip);
+        dzChipWrite(chip, 0x00U, 300U);
+
+        dzChipToggleWE(chip);
+        dzChipWrite(chip, 0x00U, 350U);
+
+        dzChipToggleWE(chip);
+        dzChipWrite(chip, 0x10U, 400U);
 
         dzChipSetCLE(chip, 1U);
         dzChipToggleWE(chip);
