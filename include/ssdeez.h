@@ -319,6 +319,9 @@ void dzDieDeinit(dzDie *die);
 /* Performs `command` on `die`. */
 void dzDieDecodeCommand(dzDie *die, dzByte command, dzTimestamp ts);
 
+/* Writes `address` to `die`'s address register. */
+void dzDieWriteAddress(dzDie *die, dzByte address, dzTimestamp ts);
+
 /* Waits until the `die`'s "RDY" status bit is set. */
 dzTimestamp dzDieWaitUntilReady(dzDie *die);
 

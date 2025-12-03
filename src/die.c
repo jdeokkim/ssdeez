@@ -73,11 +73,12 @@ typedef struct dzDieStats_ {
 /* A structure that represents a NAND flash die. */
 struct dzDie_ {
     dzDieStats stats;
+    dzChipCommand command;
     dzDieMetadata metadata;
     dzDieConfig config;
     dzByte *buffer;
     dzDieState state;
-    dzU16 columnOffset;
+    dzU16 columnAddress;
     dzByte status;
 };
 
@@ -249,6 +250,8 @@ dzResult dzDieInit(dzDie **die, dzDieConfig config) {
     newDie->metadata.currentTime = 0U;
     newDie->metadata.remainingTime = 0U;
 
+    newDie->columnAddress = UINT16_MAX;
+
     if (!dzDieInitMetadata(newDie)) {
         dzDieDeinit(newDie);
 
@@ -319,6 +322,9 @@ void dzDieDecodeCommand(dzDie *die, dzByte command, dzTimestamp ts) {
     }
 
     switch (command) {
+        case DZ_CHIP_CMD_READ_0:
+            break;
+
         case DZ_CHIP_CMD_RESET:
             dzDieReset(die);
 
@@ -327,6 +333,17 @@ void dzDieDecodeCommand(dzDie *die, dzByte command, dzTimestamp ts) {
         default:
             DZ_API_UNIMPLEMENTED();
     }
+
+    die->command = command;
+}
+
+/* Writes `address` to `die`'s address register. */
+void dzDieWriteAddress(dzDie *die, dzByte address, dzTimestamp ts) {
+    if (die == NULL || die->metadata.currentTime >= ts) return;
+
+    DZ_API_UNUSED_VARIABLE(address);
+
+    DZ_API_UNIMPLEMENTED();
 }
 
 /* Waits until the `die`'s "RDY" status bit is set. */

@@ -71,7 +71,6 @@ struct dzChip_ {
     dzUSize offset;                          // R/W Position Indicator
     dzChipState state;
     dzByte timingMode;
-    dzByte dieIndex;
 };
 
 // clang-format on
@@ -139,6 +138,14 @@ static void dzChipReadPage(dzChip *chip);
 static void dzChipReset(dzChip *chip, dzTimestamp ts);
 
 // TODO: dzChipSetFeatures()
+
+/* ------------------------------------------------------------------------> */
+
+/* 
+    Issues a "Read Page" request to the die 
+    indicated by `chip`'s row address. 
+*/
+static void dzChipRequestReadPage(dzChip *chip);
 
 /* ------------------------------------------------------------------------> */
 
@@ -217,7 +224,6 @@ dzResult dzChipInit(dzChip **chip, dzChipConfig config) {
 
         newChip->state = DZ_CHIP_STATE_IDLE;
 
-        newChip->dieIndex = 0U;
         newChip->timingMode = 0U;
     }
 
@@ -476,7 +482,7 @@ static void dzChipDecodeCommand(dzChip *chip, dzByte command, dzTimestamp ts) {
     switch (command) {
         case DZ_CHIP_CMD_GET_FEATURES:
             if (chip->config.isVerbose)
-                DZ_API_INFO("waiting for 1 address cycle\n");
+                DZ_API_INFO("waiting for 1 address cycle...\n");
 
             break;
 
@@ -487,7 +493,7 @@ static void dzChipDecodeCommand(dzChip *chip, dzByte command, dzTimestamp ts) {
 
         case DZ_CHIP_CMD_READ_0:
             if (chip->config.isVerbose)
-                DZ_API_INFO("waiting for %u address cycles\n",
+                DZ_API_INFO("waiting for %u address cycles...\n",
                             addressCycleCount);
 
             break;
@@ -521,7 +527,7 @@ static void dzChipDecodeCommand(dzChip *chip, dzByte command, dzTimestamp ts) {
 
         case DZ_CHIP_CMD_READ_ID:
             if (chip->config.isVerbose)
-                DZ_API_INFO("waiting for 1 address cycle\n");
+                DZ_API_INFO("waiting for 1 address cycle...\n");
 
             break;
 
@@ -541,6 +547,9 @@ static void dzChipWriteAddress(dzChip *chip, dzByte address, dzTimestamp ts) {
 
     chip->addresses.ptr[chip->addresses.offset++] = address;
 
+    dzByte columnAddressSize = chip->metadata.columnAddressSize;
+    dzByte rowAddressSize = chip->metadata.rowAddressSize;
+
     switch (chip->command) {
         case DZ_CHIP_CMD_GET_FEATURES:
             chip->addresses.offset = 0U;
@@ -551,14 +560,15 @@ static void dzChipWriteAddress(dzChip *chip, dzByte address, dzTimestamp ts) {
 
         case DZ_CHIP_CMD_READ_0:
             if (chip->config.isVerbose) {
-                if (chip->addresses.offset
-                    <= chip->metadata.columnAddressSize) {
+                if (chip->addresses.offset <= columnAddressSize) {
                     DZ_API_INFO("=> column address #%lu\n",
                                 chip->addresses.offset);
-                } else {
+                } else if (chip->addresses.offset
+                           < (columnAddressSize + rowAddressSize)) {
                     DZ_API_INFO("=> row address #%lu\n",
-                                chip->addresses.offset
-                                    - chip->metadata.columnAddressSize);
+                                chip->addresses.offset - columnAddressSize);
+                } else {
+                    dzChipRequestReadPage(chip);
                 }
             }
 
@@ -675,31 +685,7 @@ static void dzChipReadID(dzChip *chip, dzByte *result) {
 
 /* Performs a "Read (Read Page)" operation on `chip`. */
 static void dzChipReadPage(dzChip *chip) {
-    dzUSize bitOffset = 0U;
-
-    dzU64 dieAddress, blockAddress, pageAddress;
-
-    const dzByteArray addressCycles = { .ptr = chip->addresses.ptr + chip->metadata.columnAddressSize,
-                                        .size = chip->addresses.size };
-
-    dzUtilsReadBitsFromBytes(addressCycles,
-                             bitOffset,
-                             chip->metadata.bitCountForPageId,
-                             &pageAddress);
-
-    bitOffset += chip->metadata.bitCountForPageId;
-
-    dzUtilsReadBitsFromBytes(addressCycles,
-                             bitOffset,
-                             chip->metadata.bitCountForBlockId,
-                             &blockAddress);
-
-    bitOffset += chip->metadata.bitCountForBlockId;
-
-    dzUtilsReadBitsFromBytes(addressCycles,
-                             bitOffset,
-                             chip->metadata.bitCountForDieId,
-                             &dieAddress);
+    DZ_API_UNUSED_VARIABLE(chip);
 
     DZ_API_UNIMPLEMENTED();
 }
@@ -720,6 +706,49 @@ static void dzChipReset(dzChip *chip, dzTimestamp ts) {
 
         dzDieDecodeCommand(chip->dies[i], DZ_CHIP_CMD_RESET, ts);
     }
+}
+
+/* ------------------------------------------------------------------------> */
+
+/* 
+    Issues a "Read Page" request to the die 
+    indicated by `chip`'s row address. 
+*/
+static void dzChipRequestReadPage(dzChip *chip) {
+    dzByteArray addressCycles = { .ptr = chip->addresses.ptr
+                                         + chip->metadata.columnAddressSize,
+                                  .size = chip->addresses.size };
+
+    dzU64 dieAddress = UINT64_MAX;
+
+    dzUSize bitOffset = chip->metadata.bitCountForPageId
+                        + chip->metadata.bitCountForBlockId;
+
+    dzUtilsReadBitsFromBytes(addressCycles,
+                             bitOffset,
+                             chip->metadata.bitCountForDieId,
+                             &dieAddress);
+
+    dzID dieId = (dzID) dieAddress;
+
+    if (dieId >= chip->config.dieCount) {
+        if (chip->config.isVerbose)
+            DZ_API_WARNING("ignored invalid request with die ID %u\n", dieId);
+
+        return;
+    }
+
+    dzDieDecodeCommand(chip->dies[dieId],
+                       DZ_CHIP_CMD_READ_0,
+                       chip->metadata.currentTime);
+
+    for (dzUSize i = 0U; i < addressCycles.size; i++)
+        dzDieWriteAddress(chip->dies[dieId],
+                          addressCycles.ptr[i],
+                          chip->metadata.currentTime);
+
+    if (chip->config.isVerbose)
+        DZ_API_INFO("waiting for the last command...\n");
 }
 
 /* ------------------------------------------------------------------------> */
