@@ -75,6 +75,7 @@ struct dzDie_ {
     dzDieStats stats;
     dzChipCommand command;
     dzDieMetadata metadata;
+    dzByteStream addresses;
     dzDieConfig config;
     dzByte *buffer;
     dzDieState state;
@@ -238,19 +239,31 @@ dzResult dzDieInit(dzDie **die, dzDieConfig config) {
 
     if (config.isVerbose) DZ_API_INFO("initializing die #%u\n", config.dieId);
 
-    newDie->stats = (dzDieStats) { .totalProgramLatency = 0U,
-                                   .totalProgramCount = 0U,
-                                   .totalReadLatency = 0U,
-                                   .totalReadCount = 0U,
-                                   .totalEraseLatency = 0U,
-                                   .totalEraseCount = 0U };
+    {
+        newDie->stats = (dzDieStats) { .totalProgramLatency = 0U,
+                                       .totalProgramCount = 0U,
+                                       .totalReadLatency = 0U,
+                                       .totalReadCount = 0U,
+                                       .totalEraseLatency = 0U,
+                                       .totalEraseCount = 0U };
 
-    newDie->config = config;
+        newDie->config = config;
 
-    newDie->metadata.currentTime = 0U;
-    newDie->metadata.remainingTime = 0U;
+        newDie->addresses.size = 8U;
+        newDie->addresses.offset = 0U;
 
-    newDie->columnAddress = UINT16_MAX;
+        newDie->addresses.ptr = malloc(newDie->addresses.size
+                                       * sizeof *(newDie->addresses.ptr));
+
+        newDie->columnAddress = UINT16_MAX;
+
+        newDie->state = DZ_DIE_STATE_IDLE;
+    }
+
+    {
+        newDie->metadata.currentTime = 0U;
+        newDie->metadata.remainingTime = 0U;
+    }
 
     if (!dzDieInitMetadata(newDie)) {
         dzDieDeinit(newDie);
@@ -276,7 +289,6 @@ dzResult dzDieInit(dzDie **die, dzDieConfig config) {
         return DZ_RESULT_INJECTION_FAILED;
     }
 
-    newDie->state = DZ_DIE_STATE_IDLE;
     newDie->status = DZ_DIE_STATUS_RDY;
 
     *die = newDie;
@@ -291,35 +303,15 @@ void dzDieDeinit(dzDie *die) {
     if (die->config.isVerbose)
         DZ_API_INFO("deinitializing die #%u\n", die->config.dieId);
 
-    free(die->buffer), free(die);
+    free(die->addresses.ptr), free(die->buffer), free(die);
 }
 
 /* Performs `command` on `die`. */
-void dzDieDecodeCommand(dzDie *die, dzByte command, dzTimestamp ts) {
-    if (die == NULL || die->metadata.currentTime >= ts) return;
+void dzDieDecodeCommand(dzDie *die, dzByte command) {
+    if (die == NULL) return;
 
     if (die->config.isVerbose)
         DZ_API_INFO("decoded ONFI command 0x%02X\n", command);
-
-    dzBool isAcceptableWhileBusy = (command == DZ_CHIP_CMD_READ_STATUS)
-                                   || (command == DZ_CHIP_CMD_RESET);
-
-    if (!isAcceptableWhileBusy && !(die->status & DZ_DIE_STATUS_RDY)) {
-        if (die->config.isVerbose)
-            DZ_API_INFO("die #%u is not ready yet\n", die->config.dieId);
-
-        dzTimestamp elapsedTime = ts - die->metadata.currentTime;
-
-        if (elapsedTime < die->metadata.remainingTime) {
-            die->state = DZ_DIE_STATE_IDLE;
-
-            dzDieReset(die);
-        }
-
-        die->metadata.currentTime = ts;
-
-        return;
-    }
 
     switch (command) {
         case DZ_CHIP_CMD_READ_0:
@@ -338,12 +330,12 @@ void dzDieDecodeCommand(dzDie *die, dzByte command, dzTimestamp ts) {
 }
 
 /* Writes `address` to `die`'s address register. */
-void dzDieWriteAddress(dzDie *die, dzByte address, dzTimestamp ts) {
-    if (die == NULL || die->metadata.currentTime >= ts) return;
+void dzDieWriteAddress(dzDie *die, dzByte address) {
+    if (die == NULL || die->addresses.offset >= die->addresses.size) return;
 
-    DZ_API_UNUSED_VARIABLE(address);
+    die->addresses.ptr[die->addresses.offset++] = address;
 
-    DZ_API_UNIMPLEMENTED();
+    // TODO: ...
 }
 
 /* Waits until the `die`'s "RDY" status bit is set. */

@@ -99,26 +99,26 @@ TEST dzTestChipGetFeatures(void) {
         dzChipSetCLE(chip, 1U);
         dzChipToggleWE(chip);
 
-        dzChipWrite(chip, DZ_CHIP_CMD_GET_FEATURES, 100U);
+        dzChipWrite(chip, DZ_CHIP_CMD_GET_FEATURES);
 
         dzChipSetALE(chip, 1U);
         dzChipToggleWE(chip);
 
         // NOTE: Undefined behavior
-        dzChipWrite(chip, 0x00U, 150U);
+        dzChipWrite(chip, 0x00U);
     }
 
     {
         dzChipSetALE(chip, 1U);
         dzChipToggleWE(chip);
 
-        dzChipWrite(chip, 0x01U, 250U);
+        dzChipWrite(chip, 0x01U);
 
         dzByte data = 0xFFU;
 
         dzChipToggleRE(chip);
 
-        dzChipRead(chip, &data, 350U);
+        dzChipRead(chip, &data);
 
         // NOTE: Timing Mode 0
         ASSERT_EQ(data, 0x00U);
@@ -134,29 +134,29 @@ TEST dzTestChipRead(void) {
         dzChipSetCLE(chip, 1U);
         dzChipToggleWE(chip);
 
-        dzChipWrite(chip, DZ_CHIP_CMD_READ_0, 100U);
+        dzChipWrite(chip, DZ_CHIP_CMD_READ_0);
 
         dzChipSetALE(chip, 1U);
 
         dzChipToggleWE(chip);
-        dzChipWrite(chip, 0x01U, 200U);
+        dzChipWrite(chip, 0x01U);
 
         dzChipToggleWE(chip);
-        dzChipWrite(chip, 0x00U, 250U);
+        dzChipWrite(chip, 0x00U);
 
         dzChipToggleWE(chip);
-        dzChipWrite(chip, 0x00U, 300U);
+        dzChipWrite(chip, 0x00U);
 
         dzChipToggleWE(chip);
-        dzChipWrite(chip, 0x00U, 350U);
+        dzChipWrite(chip, 0x00U);
 
         dzChipToggleWE(chip);
-        dzChipWrite(chip, 0x10U, 400U);
+        dzChipWrite(chip, 0x10U);
 
         dzChipSetCLE(chip, 1U);
         dzChipToggleWE(chip);
 
-        dzChipWrite(chip, DZ_CHIP_CMD_READ_1, 450U);
+        dzChipWrite(chip, DZ_CHIP_CMD_READ_1);
 
         // TODO: ...
     }
@@ -173,20 +173,20 @@ TEST dzTestChipReadID(void) {
         dzChipSetCLE(chip, 1U);
         dzChipToggleWE(chip);
 
-        dzChipWrite(chip, DZ_CHIP_CMD_READ_ID, 100U);
+        dzChipWrite(chip, DZ_CHIP_CMD_READ_ID);
 
         dzChipSetALE(chip, 1U);
         dzChipToggleWE(chip);
 
         // NOTE: Undefined behavior
-        dzChipWrite(chip, 0xFFU, 150U);
+        dzChipWrite(chip, 0xFFU);
     }
 
     {
         dzChipSetALE(chip, 1U);
         dzChipToggleWE(chip);
 
-        dzChipWrite(chip, 0x20U, 200U);
+        dzChipWrite(chip, 0x20U);
 
         dzChipSetALE(chip, 0U);
         dzChipSetCLE(chip, 0U);
@@ -200,14 +200,14 @@ TEST dzTestChipReadID(void) {
              i++) {
             dzChipToggleRE(chip);
 
-            dzChipRead(chip, &data, 300U + (i * 100U));
+            dzChipRead(chip, &data);
 
             ASSERT_EQ(data, onfiSignature[i]);
         }
 
         dzChipToggleRE(chip);
 
-        dzChipRead(chip, &data, 700U);
+        dzChipRead(chip, &data);
 
         // NOTE: Undefined behavior
         ASSERT_EQ(data, 0xFFU);
@@ -217,13 +217,13 @@ TEST dzTestChipReadID(void) {
         dzChipSetALE(chip, 1U);
         dzChipToggleWE(chip);
 
-        dzChipWrite(chip, 0x00U, 1000U);
+        dzChipWrite(chip, 0x00U);
 
         dzByte data = 0xFFU;
 
         dzChipToggleRE(chip);
 
-        dzChipRead(chip, &data, 1100U);
+        dzChipRead(chip, &data);
 
         ASSERT_EQ(data, 0x00U);
     }
@@ -240,7 +240,7 @@ TEST dzTestChipReset(void) {
         dzChipSetCLE(chip, 1U);
         dzChipToggleWE(chip);
 
-        dzChipWrite(chip, DZ_CHIP_CMD_RESET, 100U);
+        dzChipWrite(chip, DZ_CHIP_CMD_RESET);
 
         ASSERT_EQ(dzChipGetRB(chip), 0U);
     }

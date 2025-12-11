@@ -95,10 +95,10 @@ static const dzByte onfiSignature[] = { 'O', 'N', 'F', 'I' };
 /* Private Function Prototypes ============================================> */
 
 /* Performs `command` on `chip`. */
-static void dzChipDecodeCommand(dzChip *chip, dzByte command, dzTimestamp ts);
+static void dzChipDecodeCommand(dzChip *chip, dzByte command);
 
 /* Writes `address` to `chip`'s address register. */
-static void dzChipWriteAddress(dzChip *chip, dzByte address, dzTimestamp ts);
+static void dzChipWriteAddress(dzChip *chip, dzByte address);
 
 /* ------------------------------------------------------------------------> */
 
@@ -135,7 +135,7 @@ static void dzChipReadPage(dzChip *chip);
 // TODO: dzChipReadUniqueID()
 
 /* Performs a "Reset" operation on `chip`. */
-static void dzChipReset(dzChip *chip, dzTimestamp ts);
+static void dzChipReset(dzChip *chip);
 
 // TODO: dzChipSetFeatures()
 
@@ -281,7 +281,7 @@ void dzChipDeinit(dzChip *chip) {
 }
 
 /* Reads `data` from `chip`'s I/O bus. */
-void dzChipRead(dzChip *chip, dzByte *data, dzTimestamp ts) {
+void dzChipRead(dzChip *chip, dzByte *data) {
     if (chip == NULL || chip->lines.chipEnable
         || chip->lines.readEnable != 0xFFU || data == NULL)
         return;
@@ -305,12 +305,11 @@ void dzChipRead(dzChip *chip, dzByte *data, dzTimestamp ts) {
             DZ_API_UNIMPLEMENTED();
     }
 
-    chip->metadata.currentTime = ts;
     chip->lines.readEnable = 1U;
 }
 
 /* Writes `data` to `chip`'s I/O bus. */
-void dzChipWrite(dzChip *chip, dzByte data, dzTimestamp ts) {
+void dzChipWrite(dzChip *chip, dzByte data) {
     if (chip == NULL || chip->lines.chipEnable
         || chip->lines.writeEnable != 0xFFU
         || (chip->lines.addrLatchEnable && chip->lines.cmdLatchEnable))
@@ -320,14 +319,13 @@ void dzChipWrite(dzChip *chip, dzByte data, dzTimestamp ts) {
         DZ_API_INFO("writing 0x%02X to chip #%u\n", data, chip->config.chipId);
 
     if (chip->lines.addrLatchEnable) {
-        dzChipWriteAddress(chip, data, ts);
+        dzChipWriteAddress(chip, data);
     } else if (chip->lines.cmdLatchEnable) {
-        dzChipDecodeCommand(chip, data, ts);
+        dzChipDecodeCommand(chip, data);
     } else {
         DZ_API_UNIMPLEMENTED();
     }
 
-    chip->metadata.currentTime = ts;
     chip->lines.writeEnable = 1U;
 }
 
@@ -345,7 +343,7 @@ dzTimestamp dzChipWaitUntilReady(dzChip *chip) {
 /* ------------------------------------------------------------------------> */
 
 /* Returns the current timestamp of `chip`, in microseconds. */
-dzTimestamp dzChipGetCurrentTime(const dzChip *chip) {
+dzTimestamp dzChipGetTime(const dzChip *chip) {
     return (chip != NULL) ? chip->metadata.currentTime : 0U;
 }
 
@@ -472,7 +470,7 @@ void dzChipToggleWE(dzChip *chip) {
 /* Private Functions ======================================================> */
 
 /* Performs `command` on `chip`. */
-static void dzChipDecodeCommand(dzChip *chip, dzByte command, dzTimestamp ts) {
+static void dzChipDecodeCommand(dzChip *chip, dzByte command) {
     if (chip->config.isVerbose)
         DZ_API_INFO("decoded ONFI command 0x%02X\n", command);
 
@@ -487,7 +485,7 @@ static void dzChipDecodeCommand(dzChip *chip, dzByte command, dzTimestamp ts) {
             break;
 
         case DZ_CHIP_CMD_RESET:
-            dzChipReset(chip, ts);
+            dzChipReset(chip);
 
             break;
 
@@ -539,7 +537,7 @@ static void dzChipDecodeCommand(dzChip *chip, dzByte command, dzTimestamp ts) {
 }
 
 /* Writes `address` to `chip`'s address register. */
-static void dzChipWriteAddress(dzChip *chip, dzByte address, dzTimestamp ts) {
+static void dzChipWriteAddress(dzChip *chip, dzByte address) {
     if (chip->addresses.offset >= chip->addresses.size) return;
 
     if (chip->config.isVerbose)
@@ -582,8 +580,6 @@ static void dzChipWriteAddress(dzChip *chip, dzByte address, dzTimestamp ts) {
         default:
             DZ_API_UNIMPLEMENTED();
     }
-
-    chip->metadata.currentTime = ts;
 }
 
 /* ------------------------------------------------------------------------> */
@@ -626,9 +622,7 @@ static void dzChipPowerOnReset(dzChip *chip) {
         if (chip->config.isVerbose)
             DZ_API_INFO("requesting a power-on reset to die #%u\n", i);
 
-        dzDieDecodeCommand(chip->dies[i],
-                           DZ_CHIP_CMD_RESET,
-                           chip->metadata.currentTime);
+        dzDieDecodeCommand(chip->dies[i], DZ_CHIP_CMD_RESET);
     }
 
     chip->metadata.remainingTime = 0U;
@@ -691,7 +685,7 @@ static void dzChipReadPage(dzChip *chip) {
 }
 
 /* Performs a "Reset" operation on `chip`. */
-static void dzChipReset(dzChip *chip, dzTimestamp ts) {
+static void dzChipReset(dzChip *chip) {
     // NOTE: Target-level Command
     if (!dzChipIsReady(chip)) {
         if (chip->config.isVerbose)
@@ -704,7 +698,7 @@ static void dzChipReset(dzChip *chip, dzTimestamp ts) {
         if (chip->config.isVerbose)
             DZ_API_INFO("requesting a reset to die #%u\n", i);
 
-        dzDieDecodeCommand(chip->dies[i], DZ_CHIP_CMD_RESET, ts);
+        dzDieDecodeCommand(chip->dies[i], DZ_CHIP_CMD_RESET);
     }
 }
 
@@ -715,16 +709,16 @@ static void dzChipReset(dzChip *chip, dzTimestamp ts) {
     indicated by `chip`'s row address. 
 */
 static void dzChipRequestReadPage(dzChip *chip) {
-    dzByteArray addressCycles = { .ptr = chip->addresses.ptr
-                                         + chip->metadata.columnAddressSize,
-                                  .size = chip->addresses.size };
+    dzByteArray rowAddress = { .ptr = chip->addresses.ptr
+                                      + chip->metadata.columnAddressSize,
+                               .size = chip->addresses.offset };
 
     dzU64 dieAddress = UINT64_MAX;
 
     dzUSize bitOffset = chip->metadata.bitCountForPageId
                         + chip->metadata.bitCountForBlockId;
 
-    dzUtilsReadBitsFromBytes(addressCycles,
+    dzUtilsReadBitsFromBytes(rowAddress,
                              bitOffset,
                              chip->metadata.bitCountForDieId,
                              &dieAddress);
@@ -738,14 +732,10 @@ static void dzChipRequestReadPage(dzChip *chip) {
         return;
     }
 
-    dzDieDecodeCommand(chip->dies[dieId],
-                       DZ_CHIP_CMD_READ_0,
-                       chip->metadata.currentTime);
+    dzDieDecodeCommand(chip->dies[dieId], DZ_CHIP_CMD_READ_0);
 
-    for (dzUSize i = 0U; i < addressCycles.size; i++)
-        dzDieWriteAddress(chip->dies[dieId],
-                          addressCycles.ptr[i],
-                          chip->metadata.currentTime);
+    for (dzUSize i = 0U; i < chip->addresses.offset; i++)
+        dzDieWriteAddress(chip->dies[dieId], chip->addresses.ptr[i]);
 
     if (chip->config.isVerbose)
         DZ_API_INFO("waiting for the last command...\n");

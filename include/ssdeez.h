@@ -240,7 +240,7 @@ typedef struct dzChipConfig_ {
     dzBool isVerbose;
 } dzChipConfig;
 
-/* A structure that represents a NAND flash chip, also known as a 'target'. */
+/* A structure that represents a NAND flash chip. */
 typedef struct dzChip_ dzChip;
 
 /* Constants ==============================================================> */
@@ -259,18 +259,13 @@ dzResult dzChipInit(dzChip **chip, dzChipConfig config);
 void dzChipDeinit(dzChip *chip);
 
 /* Reads data from `chip`'s I/O bus. */
-void dzChipRead(dzChip *chip, dzByte *data, dzTimestamp ts);
+void dzChipRead(dzChip *chip, dzByte *data);
 
 /* Writes `data` to `chip`'s I/O bus. */
-void dzChipWrite(dzChip *chip, dzByte data, dzTimestamp ts);
+void dzChipWrite(dzChip *chip, dzByte data);
 
 /* Waits until `chip` is ready. */
 dzTimestamp dzChipWaitUntilReady(dzChip *chip);
-
-/* ------------------------------------------------------------------------> */
-
-/* Returns the current timestamp of `chip`, in microseconds. */
-dzTimestamp dzChipGetCurrentTime(const dzChip *chip);
 
 /* ------------------------------------------------------------------------> */
 
@@ -317,10 +312,10 @@ dzResult dzDieInit(dzDie **die, dzDieConfig config);
 void dzDieDeinit(dzDie *die);
 
 /* Performs `command` on `die`. */
-void dzDieDecodeCommand(dzDie *die, dzByte command, dzTimestamp ts);
+void dzDieDecodeCommand(dzDie *die, dzByte command);
 
 /* Writes `address` to `die`'s address register. */
-void dzDieWriteAddress(dzDie *die, dzByte address, dzTimestamp ts);
+void dzDieWriteAddress(dzDie *die, dzByte address);
 
 /* Waits until the `die`'s "RDY" status bit is set. */
 dzTimestamp dzDieWaitUntilReady(dzDie *die);
