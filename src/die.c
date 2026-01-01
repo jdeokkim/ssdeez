@@ -49,7 +49,6 @@ typedef enum dzDieState_ {
 
 /* A structure that represents the metadata of a NAND flash die. */
 typedef struct dzDieMetadata_ {
-    dzTimestamp currentTime;
     dzTimestamp remainingTime;
     dzU64 pageCountPerDie;
     dzU32 blockCountPerDie;
@@ -79,7 +78,6 @@ struct dzDie_ {
     dzDieConfig config;
     dzByte *buffer;
     dzDieState state;
-    dzU16 columnAddress;
     dzByte status;
 };
 
@@ -177,7 +175,7 @@ static dzBool dzDieInitPages(dzDie *die);
 /* Mark a random number of blocks as defective. */
 static dzBool dzDieCorruptRandomBlocks(dzDie *die);
 
-/* Creates an ONFI parameter page section on the first block of `die`.  */
+/* Creates an ONFI parameter page section on the first block of `die`. */
 static dzBool dzDieCreateParameterPages(dzDie *die);
 
 /* Returns the previous or the next index of `blockIndex` within `die`. */
@@ -203,6 +201,7 @@ dzResult dzDieInit(dzDie **die, dzDieConfig config) {
     // clang-format off
 
     if (die == NULL
+        || config.chipId == DZ_API_INVALID_ID
         || config.dieId == DZ_API_INVALID_ID
         || config.cellType <= DZ_CELL_TYPE_UNKNOWN
         || config.cellType >= DZ_CELL_TYPE_COUNT_
@@ -237,7 +236,8 @@ dzResult dzDieInit(dzDie **die, dzDieConfig config) {
 
     if (newDie == NULL) return DZ_RESULT_OUT_OF_MEMORY;
 
-    if (config.isVerbose) DZ_API_INFO("initializing die #%u\n", config.dieId);
+    if (config.isVerbose)
+        DZ_API_INFO("initializing C%u:D%u\n", config.chipId, config.dieId);
 
     {
         newDie->stats = (dzDieStats) { .totalProgramLatency = 0U,
@@ -255,14 +255,7 @@ dzResult dzDieInit(dzDie **die, dzDieConfig config) {
         newDie->addresses.ptr = malloc(newDie->addresses.size
                                        * sizeof *(newDie->addresses.ptr));
 
-        newDie->columnAddress = UINT16_MAX;
-
         newDie->state = DZ_DIE_STATE_IDLE;
-    }
-
-    {
-        newDie->metadata.currentTime = 0U;
-        newDie->metadata.remainingTime = 0U;
     }
 
     if (!dzDieInitMetadata(newDie)) {
@@ -301,7 +294,9 @@ void dzDieDeinit(dzDie *die) {
     if (die == NULL) return;
 
     if (die->config.isVerbose)
-        DZ_API_INFO("deinitializing die #%u\n", die->config.dieId);
+        DZ_API_INFO("deinitializing C%u:D%u\n",
+                    die->config.chipId,
+                    die->config.dieId);
 
     free(die->addresses.ptr), free(die->buffer), free(die);
 }
@@ -345,7 +340,8 @@ dzTimestamp dzDieWaitUntilReady(dzDie *die) {
     dzTimestamp result = die->metadata.remainingTime;
 
     if (die->config.isVerbose)
-        DZ_API_INFO("die #%u: waiting for %lu us until ready\n",
+        DZ_API_INFO("C%u:D%u: waiting for %lu us until ready\n",
+                    die->config.chipId,
                     die->config.dieId,
                     result);
 
@@ -358,8 +354,6 @@ dzTimestamp dzDieWaitUntilReady(dzDie *die) {
         default:
             DZ_API_UNIMPLEMENTED();
     }
-
-    die->metadata.currentTime += result;
 
     return result;
 }
@@ -413,6 +407,8 @@ static dzBool dzDieInitMetadata(dzDie *die) {
 
         die->metadata.maxProgramTime = tBERSMu + (dzU32) (3.0 * tBERSSigma);
     }
+
+    die->metadata.remainingTime = 0U;
 
     return true;
 }
@@ -477,7 +473,7 @@ static dzBool dzDieCorruptRandomBlocks(dzDie *die) {
     return true;
 }
 
-/* Creates an ONFI parameter page section on the first block of `die`.  */
+/* Creates an ONFI parameter page section on the first block of `die`. */
 static dzBool dzDieCreateParameterPages(dzDie *die) {
     DZ_API_UNUSED_VARIABLE(die);
 
@@ -565,7 +561,8 @@ static void dzDieReset(dzDie *die) {
         die->status &= (dzByte) ~DZ_DIE_STATUS_RDY;
 
         if (die->config.isVerbose)
-            DZ_API_INFO("cleared die #%u's RDY status bit\n",
+            DZ_API_INFO("cleared C%u:D%u's RDY status bit\n",
+                        die->config.chipId,
                         die->config.dieId);
 
         die->state = DZ_DIE_STATE_RST_EXECUTE;
@@ -584,7 +581,9 @@ static void dzDieReset(dzDie *die) {
         die->status |= DZ_DIE_STATUS_RDY;
 
         if (die->config.isVerbose)
-            DZ_API_INFO("set die #%u's RDY status bit\n", die->config.dieId);
+            DZ_API_INFO("set C%u:D%u's RDY status bit\n",
+                        die->config.chipId,
+                        die->config.dieId);
 
         die->state = DZ_DIE_STATE_IDLE;
 

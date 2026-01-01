@@ -217,7 +217,7 @@ typedef dzByteArray dzPage;
 
 /* A structure that represents the configuration of a NAND flash die. */
 typedef struct dzDieConfig_ {
-    dzID dieId;
+    dzID chipId, dieId;
     dzF32 badBlockRatio;
     dzCellType cellType;
     dzU16 planeCountPerDie;
